@@ -129,22 +129,43 @@ function ProfileContent() {
             </div>
             <div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                Meta (Facebook + Instagram)
+                Social Channels (Meta Suite)
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Single login grants permission for all your Facebook Pages &amp; connected Instagram accounts
+                Connect Instagram, Facebook, and Threads independently using your single Meta App
               </p>
             </div>
           </div>
 
-          <a
-            href="/api/oauth/facebook"
-            className="btn btn-primary"
-            style={{ background: '#1877f2', padding: '0.75rem 1.5rem', fontSize: '0.95rem' }}
-          >
-            <Link2 size={18} />
-            <span>{metaAccounts.length > 0 ? 'Add / Reconnect Meta' : 'Connect Meta'}</span>
-          </a>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <a
+              href={`/api/oauth/instagram${user?.id ? `?userId=${encodeURIComponent(user.id)}` : ''}`}
+              className="btn btn-primary"
+              style={{ background: 'linear-gradient(45deg, #f09433, #dc2743, #bc1888)', padding: '0.65rem 1rem', fontSize: '0.86rem' }}
+              title="Connect Instagram via Instagram OAuth"
+            >
+              <InstagramIcon size={16} />
+              <span>Instagram OAuth</span>
+            </a>
+            <a
+              href={`/api/oauth/facebook${user?.id ? `?userId=${encodeURIComponent(user.id)}` : ''}`}
+              className="btn btn-primary"
+              style={{ background: '#1877f2', padding: '0.65rem 1rem', fontSize: '0.86rem' }}
+              title="Connect Facebook via FB OAuth"
+            >
+              <FacebookIcon size={16} />
+              <span>FB OAuth</span>
+            </a>
+            <a
+              href={`/api/oauth/threads${user?.id ? `?userId=${encodeURIComponent(user.id)}` : ''}`}
+              className="btn btn-primary"
+              style={{ background: '#0f172a', padding: '0.65rem 1rem', fontSize: '0.86rem' }}
+              title="Connect Threads via Threads OAuth"
+            >
+              <ThreadsIcon size={16} />
+              <span>Threads OAuth</span>
+            </a>
+          </div>
         </div>
 
         {/* Connected Meta Accounts List */}

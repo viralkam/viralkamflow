@@ -5,12 +5,33 @@ export const dynamic = 'force-dynamic';
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { InstagramIcon, FacebookIcon, FacebookFilledIcon, ThreadsIcon } from '@/components/PlatformIcons';
-import { CheckCircle2, AlertTriangle, Link2, Trash2, Shield, Wifi } from 'lucide-react';
+import {
+  InstagramIcon,
+  FacebookIcon,
+  FacebookFilledIcon,
+  ThreadsIcon,
+  YouTubeIcon,
+} from '@/components/PlatformIcons';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Link2,
+  Trash2,
+  Shield,
+  Wifi,
+  ExternalLink,
+  Info,
+} from 'lucide-react';
 
 export default function ConnectPage() {
   return (
-    <Suspense fallback={<div className="app-container" style={{ textAlign: 'center', padding: '3rem' }}>Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="app-container" style={{ textAlign: 'center', padding: '3rem' }}>
+          Loading...
+        </div>
+      }
+    >
       <ConnectContent />
     </Suspense>
   );
@@ -29,106 +50,159 @@ function ConnectContent() {
 
   useEffect(() => {
     const connected = searchParams.get('connected');
+    const platform = searchParams.get('platform');
     const name = searchParams.get('name');
+
     if (connected === 'true') {
       if (name && !user.loggedIn) login({ name });
-      setSuccessMsg(`Meta account connected successfully${name ? `: ${name}` : ''}!`);
+      const platformDisplay = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Channel';
+      setSuccessMsg(`${platformDisplay} connected successfully${name ? `: ${name}` : ''}!`);
       refreshData();
-      setTimeout(() => setSuccessMsg(null), 5000);
+      setTimeout(() => setSuccessMsg(null), 6000);
     }
+
     const error = searchParams.get('error');
     if (error) {
       setErrorMsg(`Connection error: ${error}. Please try again.`);
-      setTimeout(() => setErrorMsg(null), 6000);
+      setTimeout(() => setErrorMsg(null), 7000);
     }
-  }, [searchParams, refreshData, login]);
+  }, [searchParams, refreshData, login, user.loggedIn]);
 
   if (!isLoaded || !user.loggedIn) return null;
 
-  const metaAccounts = accounts.filter(a =>
-    (a.platform === 'Facebook' || a.platform === 'Instagram' || a.platform === 'Threads') &&
-    a.connectionType === 'oauth' && a.connectionStatus === 'Connected'
+  const connectedAccounts = accounts.filter(
+    (a) => a.connectionType === 'oauth' && a.connectionStatus === 'Connected'
   );
 
-  const igAccounts = metaAccounts.filter(a => a.platform === 'Instagram');
-  const fbAccounts = metaAccounts.filter(a => a.platform === 'Facebook');
+  const igAccounts = connectedAccounts.filter((a) => a.platform === 'Instagram');
+  const fbAccounts = connectedAccounts.filter((a) => a.platform === 'Facebook');
+  const thAccounts = connectedAccounts.filter((a) => a.platform === 'Threads');
+  const ytAccounts = connectedAccounts.filter((a) => a.platform === 'YouTube');
 
-  const handleDisconnect = async (id: string) => {
-    if (confirm('Disconnect this account?')) {
+  const handleDisconnect = async (id: string, platformName: string) => {
+    if (confirm(`Disconnect ${platformName} account?`)) {
       await deleteAccount(id);
       await refreshData();
     }
   };
 
+  const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
+  const metaAppId = '1656696732464075';
+
   return (
-    <div className="app-container" style={{ maxWidth: '850px' }}>
+    <div className="app-container" style={{ maxWidth: '920px' }}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: '#eff6ff', color: '#1877f2',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: '#eff6ff',
+              color: '#1877f2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <Link2 size={22} />
           </div>
           <div>
-            <h1 className="page-title" style={{ fontSize: '1.6rem' }}>Connect Accounts</h1>
-            <p className="page-desc">Link your Facebook & Instagram accounts via Meta OAuth</p>
+            <h1 className="page-title" style={{ fontSize: '1.65rem' }}>Connect Channels</h1>
+            <p className="page-desc">
+              Connect Instagram, Facebook, Threads & YouTube individually via isolated OAuth
+            </p>
           </div>
         </div>
       </div>
 
       {/* Notifications */}
       {successMsg && (
-        <div style={{
-          padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)',
-          background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46',
-          fontSize: '0.9rem', fontWeight: 600, marginBottom: '1.5rem',
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-        }}>
+        <div
+          style={{
+            padding: '0.85rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+          }}
+        >
           <CheckCircle2 size={18} color="#059669" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div style={{
-          padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)',
-          background: '#fff1f2', border: '1px solid #fecdd3', color: '#9f1239',
-          fontSize: '0.9rem', fontWeight: 600, marginBottom: '1.5rem',
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-        }}>
+        <div
+          style={{
+            padding: '0.85rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            color: '#9f1239',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+          }}
+        >
           <AlertTriangle size={18} color="#e11d48" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Status Summary */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem', marginBottom: '1.75rem',
-      }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '1rem',
+          marginBottom: '2rem',
+        }}
+      >
         <div className="card" style={{ padding: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: '#fdf2f8', color: '#E1306C',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#fdf2f8',
+              color: '#E1306C',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <InstagramIcon size={20} />
           </div>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>{igAccounts.length}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>Instagram Accounts</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>Instagram</div>
           </div>
         </div>
 
         <div className="card" style={{ padding: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: '#eff6ff', color: '#1877f2',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#eff6ff',
+              color: '#1877f2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <FacebookIcon size={20} />
           </div>
           <div>
@@ -138,122 +212,557 @@ function ConnectContent() {
         </div>
 
         <div className="card" style={{ padding: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: '#ecfdf5', color: '#059669',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#f8fafc',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ThreadsIcon size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>{thAccounts.length}</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>Threads</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#ecfdf5',
+              color: '#059669',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <Wifi size={20} />
           </div>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#059669' }}>
-              {metaAccounts.length > 0 ? 'Active' : 'Inactive'}
+              {connectedAccounts.length > 0 ? `${connectedAccounts.length} Connected` : 'None'}
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>Connection Status</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>Total Channels</div>
           </div>
         </div>
       </div>
 
-      {/* Meta OAuth Card */}
-      <div className="card" style={{ padding: '2rem', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{
-              width: '56px', height: '56px', borderRadius: '14px',
-              background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#1877f2',
-            }}>
-              <FacebookFilledIcon size={28} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                Meta (Facebook + Instagram)
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                One login connects all your Facebook Pages & Instagram accounts
-              </p>
-            </div>
-          </div>
-
-          <a
-            href={`/api/oauth/facebook${user?.id ? `?userId=${encodeURIComponent(user.id)}` : ''}`}
-            className="btn btn-primary"
-            style={{ background: '#1877f2', padding: '0.8rem 1.75rem', fontSize: '0.95rem' }}
-          >
-            <Link2 size={18} />
-            <span>{metaAccounts.length > 0 ? 'Add / Reconnect' : 'Connect Meta'}</span>
-          </a>
-        </div>
-
-        {/* Security Info */}
-        <div style={{
-          marginTop: '1.25rem', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)',
-          background: '#f8fafc', border: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: '0.6rem',
-          fontSize: '0.82rem', color: 'var(--text-muted)',
-        }}>
-          <Shield size={16} color="#4f46e5" />
-          <span>OAuth 2.0 secure connection · Graph API v22.0 · Tokens stored server-side only</span>
-        </div>
-
-        {/* Connected Accounts */}
-        {metaAccounts.length > 0 ? (
-          <div style={{ marginTop: '1.75rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Linked Channels ({metaAccounts.length}):
-            </span>
-            {metaAccounts.map((acc) => (
-              <div key={acc.id} style={{
-                padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)',
-                background: '#f8fafc', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '9px',
-                    background: acc.platform === 'Instagram' ? '#fdf2f8' : (acc.platform === 'Threads' ? '#f1f5f9' : '#eff6ff'),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: acc.platform === 'Instagram' ? '#db2777' : (acc.platform === 'Threads' ? '#0f172a' : '#1877f2'),
-                  }}>
-                    {acc.platform === 'Instagram' ? <InstagramIcon size={18} /> :
-                     acc.platform === 'Threads' ? <ThreadsIcon size={18} /> :
-                     <FacebookIcon size={18} />}
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>{acc.clientName}</strong>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
-                      ({acc.platform})
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span className="badge badge-success">
-                    <CheckCircle2 size={10} /> Connected
-                  </span>
-                  <button
-                    onClick={() => handleDisconnect(acc.id)}
-                    className="btn btn-ghost btn-sm"
-                    style={{ color: 'var(--danger)' }}
-                    title="Disconnect"
-                  >
-                    <Trash2 size={14} />
-                    <span>Remove</span>
-                  </button>
-                </div>
+      {/* Grid of Platform Cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
+        
+        {/* 1. INSTAGRAM CARD */}
+        <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid #E1306C' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                }}
+              >
+                <InstagramIcon size={26} />
               </div>
-            ))}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>Instagram</h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: '#fdf2f8',
+                      color: '#db2777',
+                    }}
+                  >
+                    Instagram OAuth
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Connect your Instagram Professional or Creator account for Reels, media posts & auto-replies
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <a
+                href={`/api/oauth/instagram${userIdParam}`}
+                className="btn btn-primary"
+                style={{
+                  background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+                  padding: '0.75rem 1.4rem',
+                  fontSize: '0.92rem',
+                }}
+              >
+                <Link2 size={17} />
+                <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
+              </a>
+              <a
+                href={`/api/oauth/instagram?mode=meta_dialog${user?.id ? `&userId=${encodeURIComponent(user.id)}` : ''}`}
+                style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
+                title="Connect using Facebook Dialog with Instagram scopes if needed"
+              >
+                via Meta Dialog
+              </a>
+            </div>
           </div>
-        ) : (
-          <div style={{
-            marginTop: '1.5rem', padding: '1.5rem',
-            borderRadius: 'var(--radius-sm)', background: '#f8fafc',
-            border: '1px dashed var(--border)', textAlign: 'center',
-            color: 'var(--text-muted)', fontSize: '0.88rem',
-          }}>
-            No Meta account linked yet. Click &apos;Connect Meta&apos; above to grant Facebook and Instagram permissions.
+
+          {/* Instagram Connected List */}
+          {igAccounts.length > 0 && (
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                Connected Instagram Accounts ({igAccounts.length}):
+              </span>
+              {igAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#fdf2f8',
+                    border: '1px solid #fbcfe8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#db2777',
+                      }}
+                    >
+                      <InstagramIcon size={18} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>@{acc.clientName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
+                        ID: {acc.oauthAccountId || acc.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span className="badge badge-success">
+                      <CheckCircle2 size={10} /> Active
+                    </span>
+                    <button
+                      onClick={() => handleDisconnect(acc.id, 'Instagram')}
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)' }}
+                      title="Disconnect"
+                    >
+                      <Trash2 size={14} />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 2. FACEBOOK CARD */}
+        <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid #1877f2' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '14px',
+                  background: '#eff6ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#1877f2',
+                }}
+              >
+                <FacebookFilledIcon size={28} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>Facebook</h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: '#eff6ff',
+                      color: '#1877f2',
+                    }}
+                  >
+                    FB OAuth
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Connect your Facebook Pages to publish feed posts, video reels & moderate comments
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={`/api/oauth/facebook${userIdParam}`}
+              className="btn btn-primary"
+              style={{ background: '#1877f2', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
+            >
+              <Link2 size={17} />
+              <span>{fbAccounts.length > 0 ? 'Add / Reconnect Facebook' : 'Connect Facebook'}</span>
+            </a>
           </div>
-        )}
+
+          {/* Facebook Connected List */}
+          {fbAccounts.length > 0 && (
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                Connected Facebook Pages ({fbAccounts.length}):
+              </span>
+              {fbAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#1877f2',
+                      }}
+                    >
+                      <FacebookIcon size={18} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>{acc.clientName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
+                        Page ID: {acc.oauthAccountId || acc.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span className="badge badge-success">
+                      <CheckCircle2 size={10} /> Active
+                    </span>
+                    <button
+                      onClick={() => handleDisconnect(acc.id, 'Facebook')}
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)' }}
+                      title="Disconnect"
+                    >
+                      <Trash2 size={14} />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 3. THREADS CARD */}
+        <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid #0f172a' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '14px',
+                  background: '#0f172a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                }}
+              >
+                <ThreadsIcon size={24} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>Threads</h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: '#f1f5f9',
+                      color: '#0f172a',
+                    }}
+                  >
+                    Threads OAuth
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Connect your Threads profile directly to post text discussions, media and threads
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={`/api/oauth/threads${userIdParam}`}
+              className="btn btn-primary"
+              style={{ background: '#0f172a', color: '#ffffff', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
+            >
+              <Link2 size={17} />
+              <span>{thAccounts.length > 0 ? 'Add / Reconnect Threads' : 'Connect Threads'}</span>
+            </a>
+          </div>
+
+          {/* Threads Connected List */}
+          {thAccounts.length > 0 && (
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                Connected Threads Accounts ({thAccounts.length}):
+              </span>
+              {thAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#0f172a',
+                      }}
+                    >
+                      <ThreadsIcon size={18} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>@{acc.clientName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
+                        ID: {acc.oauthAccountId || acc.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span className="badge badge-success">
+                      <CheckCircle2 size={10} /> Active
+                    </span>
+                    <button
+                      onClick={() => handleDisconnect(acc.id, 'Threads')}
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)' }}
+                      title="Disconnect"
+                    >
+                      <Trash2 size={14} />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 4. YOUTUBE CARD */}
+        <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid #ef4444' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '14px',
+                  background: '#fef2f2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#dc2626',
+                }}
+              >
+                <YouTubeIcon size={26} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>YouTube</h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: '#fee2e2',
+                      color: '#dc2626',
+                    }}
+                  >
+                    Google OAuth
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Connect your YouTube channel to schedule video uploads & YouTube Shorts
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={`/api/oauth/youtube${userIdParam}`}
+              className="btn btn-primary"
+              style={{ background: '#dc2626', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
+            >
+              <Link2 size={17} />
+              <span>{ytAccounts.length > 0 ? 'Add / Reconnect YouTube' : 'Connect YouTube'}</span>
+            </a>
+          </div>
+
+          {/* YouTube Connected List */}
+          {ytAccounts.length > 0 && (
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                Connected YouTube Channels ({ytAccounts.length}):
+              </span>
+              {ytAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#dc2626',
+                      }}
+                    >
+                      <YouTubeIcon size={18} />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>{acc.clientName}</strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
+                        Channel ID: {acc.oauthAccountId || acc.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span className="badge badge-success">
+                      <CheckCircle2 size={10} /> Active
+                    </span>
+                    <button
+                      onClick={() => handleDisconnect(acc.id, 'YouTube')}
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)' }}
+                      title="Disconnect"
+                    >
+                      <Trash2 size={14} />
+                      <span>Disconnect</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Meta App Architecture Note */}
+      <div
+        style={{
+          padding: '1.25rem 1.5rem',
+          borderRadius: 'var(--radius-md)',
+          background: '#f8fafc',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'flex-start',
+        }}
+      >
+        <div
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
+            background: '#e0e7ff',
+            color: '#4338ca',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginTop: '2px',
+          }}
+        >
+          <Shield size={20} />
+        </div>
+        <div>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+            Single Meta Developer App Architecture
+          </h4>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+            Instagram, Facebook, and Threads are all powered by your single Meta App (App ID:{' '}
+            <code style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px', fontSize: '0.82rem' }}>
+              {metaAppId}
+            </code>
+            ). You do <strong>not</strong> need multiple Meta apps! Each platform initiates its own isolated OAuth
+            dialog (Instagram OAuth, Facebook OAuth, Threads OAuth) using the same verified Meta credentials.
+          </p>
+        </div>
       </div>
     </div>
   );

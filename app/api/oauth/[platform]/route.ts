@@ -3,6 +3,7 @@ import {
   getFacebookOAuthRedirectUri,
   getInstagramOAuthRedirectUri,
   getYouTubeOAuthRedirectUri,
+  getOAuthRedirectUri,
   getCleanMetaCredentials,
   getCleanGoogleCredentials,
   buildFacebookOAuthUrl,
@@ -33,14 +34,13 @@ export async function GET(
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=meta', request.url)
+        new URL('/connect?error=oauth_not_configured&platform=facebook', request.url)
       );
     }
 
     const redirectUri = getFacebookOAuthRedirectUri(request);
-    // Request full unified Meta permissions so 1 authorization connects both FB Page and linked Instagram account,
-    // plus comment management and messaging permissions for Auto-Reply & Auto-DM on both platforms
-    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+    // Facebook Page connection, publishing, comments, and messaging scopes
+    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,pages_read_user_content';
     const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
@@ -58,9 +58,20 @@ export async function GET(
     }
 
     const redirectUri = getInstagramOAuthRedirectUri(request);
-    const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+    const mode = searchParams.get('mode'); // 'instagram_login' (default) or 'meta_dialog'
 
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    if (mode === 'meta_dialog') {
+      // Instagram Graph API via Meta Facebook Dialog
+      const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+      const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
+      return NextResponse.redirect(authUrl);
+    }
+
+    // Direct Instagram OAuth (Instagram Login for Professionals / Business)
+    const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+    const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
 
@@ -76,7 +87,7 @@ export async function GET(
       );
     }
 
-    const redirectUri = `${request.nextUrl.origin}/api/oauth/threads/callback`;
+    const redirectUri = getOAuthRedirectUri('threads', request);
     const scopes = 'threads_basic,threads_content_publish';
 
     const authUrl = `https://threads.net/oauth/authorize?client_id=${clientId}&app_id=${clientId}&redirect_uri=${encodeURIComponent(

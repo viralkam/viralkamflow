@@ -52,70 +52,98 @@ export async function GET(
     let clientName = '';
     let linkedIgAccount: { id: string; username?: string; name?: string } | null = null;
 
-    if (platformKey === 'instagram' || platformKey === 'facebook') {
+    if (platformKey === 'instagram') {
       const { clientId, clientSecret } = getCleanMetaCredentials();
 
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
-          new URL(`/connect?error=oauth_not_configured&platform=${platformKey}`, request.url)
+          new URL(`/connect?error=oauth_not_configured&platform=instagram`, request.url)
         );
       }
 
-      // 1. Exchange code for short-lived access token
-      const tokenRes = await fetch(
-        `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-          redirectUri
-        )}&client_secret=${clientSecret}&code=${code}`
-      );
-      const tokenData = await tokenRes.json();
+      let igExchangeSuccess = false;
 
-      if (!tokenRes.ok || !tokenData.access_token) {
-        throw new Error(tokenData.error?.message || 'Failed to exchange Meta access token');
-      }
-
-      let userAccessToken = tokenData.access_token;
-
-      // 2. Exchange for 60-day long-lived access token
+      // 1. Attempt direct Instagram Login OAuth exchange (api.instagram.com)
       try {
-        const longLivedRes = await fetch(
-          `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`
-        );
-        const longLivedData = await longLivedRes.json();
-        if (longLivedData.access_token) {
-          userAccessToken = longLivedData.access_token;
-          expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
+        const igTokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'authorization_code',
+            redirect_uri: redirectUri,
+            code,
+          }),
+        });
+        const igTokenData = await igTokenRes.json();
+
+        if (igTokenRes.ok && igTokenData.access_token) {
+          let igAccessToken = igTokenData.access_token;
+          accountId = String(igTokenData.user_id || `ig-${Date.now()}`);
+
+          // Exchange for 60-day long-lived token
+          try {
+            const longLivedRes = await fetch(
+              `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${igAccessToken}`
+            );
+            const longLivedData = await longLivedRes.json();
+            if (longLivedData.access_token) {
+              igAccessToken = longLivedData.access_token;
+              expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
+            }
+          } catch (longErr) {
+            console.warn('[IG OAuth] Long-lived exchange error:', longErr);
+          }
+
+          accessToken = igAccessToken;
+
+          // Fetch Instagram profile username
+          try {
+            const meRes = await fetch(
+              `https://graph.instagram.com/v22.0/me?fields=id,username,name&access_token=${accessToken}`
+            );
+            const meData = await meRes.json();
+            clientName = meData.username || meData.name || 'Instagram User';
+            if (meData.id) accountId = meData.id;
+          } catch {
+            clientName = 'Instagram Account';
+          }
+
+          igExchangeSuccess = true;
         }
-      } catch (e) {
-        console.warn('Long lived exchange warning:', e);
+      } catch (igDirectErr) {
+        console.warn('[IG OAuth] Direct exchange attempt error:', igDirectErr);
       }
 
-      accessToken = userAccessToken;
-
-      // 3. Meta Page Access-Token Flow
-      if (platformKey === 'facebook') {
-        // Query user's Facebook Pages AND linked Instagram accounts in one call
-        const accountsRes = await fetch(
-          `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,category,tasks,instagram_business_account{id,username,name}&access_token=${userAccessToken}`
+      // 2. If direct exchange did not succeed, fallback to Meta Facebook Graph API exchange
+      if (!igExchangeSuccess) {
+        const tokenRes = await fetch(
+          `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+            redirectUri
+          )}&client_secret=${clientSecret}&code=${code}`
         );
-        const accountsData = await accountsRes.json();
+        const tokenData = await tokenRes.json();
 
-        if (accountsData.data && Array.isArray(accountsData.data) && accountsData.data.length > 0) {
-          const targetPage = accountsData.data.find(
-            (p: any) => p.tasks?.includes('CREATE_CONTENT') || p.tasks?.includes('MANAGE')
-          ) || accountsData.data[0];
-
-          accountId = targetPage.id;
-          clientName = targetPage.name;
-          accessToken = targetPage.access_token || userAccessToken;
-          linkedIgAccount = targetPage.instagram_business_account || null;
-        } else {
-          // Fallback to user profile if no managed pages found
-          const meRes = await fetch(`https://graph.facebook.com/v22.0/me?access_token=${userAccessToken}`);
-          const meData = await meRes.json();
-          accountId = meData.id || `meta-${Date.now()}`;
-          clientName = meData.name || 'Facebook Page';
+        if (!tokenRes.ok || !tokenData.access_token) {
+          throw new Error(tokenData.error?.message || 'Failed to exchange Instagram access token');
         }
-      } else if (platformKey === 'instagram') {
+
+        let userAccessToken = tokenData.access_token;
+
+        try {
+          const longLivedRes = await fetch(
+            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`
+          );
+          const longLivedData = await longLivedRes.json();
+          if (longLivedData.access_token) {
+            userAccessToken = longLivedData.access_token;
+            expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
+          }
+        } catch (e) {
+          console.warn('Long lived exchange warning:', e);
+        }
+
         // Query linked Instagram Business Account from managed pages
         const accountsRes = await fetch(
           `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${userAccessToken}`
@@ -135,10 +163,11 @@ export async function GET(
           }
         }
 
-        // Fallback: Try via Business Portfolio (for pages managed through Business Manager)
         if (!igFound) {
           try {
-            const meRes2 = await fetch(`https://graph.facebook.com/v22.0/me?fields=businesses{owned_pages{id,name,access_token,instagram_business_account{id,username}}}&access_token=${userAccessToken}`);
+            const meRes2 = await fetch(
+              `https://graph.facebook.com/v22.0/me?fields=businesses{owned_pages{id,name,access_token,instagram_business_account{id,username}}}&access_token=${userAccessToken}`
+            );
             const meData2 = await meRes2.json();
             const businesses = meData2.businesses?.data || [];
             for (const biz of businesses) {
@@ -160,12 +189,70 @@ export async function GET(
         }
 
         if (!igFound) {
-          // Last resort: use user ID (will be updated when page is properly linked)
           const meRes = await fetch(`https://graph.facebook.com/v22.0/me?access_token=${userAccessToken}`);
           const meData = await meRes.json();
           accountId = meData.id || `meta-${Date.now()}`;
           clientName = meData.name || 'Instagram Account';
+          accessToken = userAccessToken;
         }
+      }
+    } else if (platformKey === 'facebook') {
+      const { clientId, clientSecret } = getCleanMetaCredentials();
+
+      if (!clientId || !clientSecret) {
+        return NextResponse.redirect(
+          new URL(`/connect?error=oauth_not_configured&platform=facebook`, request.url)
+        );
+      }
+
+      // 1. Exchange code for short-lived access token
+      const tokenRes = await fetch(
+        `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&client_secret=${clientSecret}&code=${code}`
+      );
+      const tokenData = await tokenRes.json();
+
+      if (!tokenRes.ok || !tokenData.access_token) {
+        throw new Error(tokenData.error?.message || 'Failed to exchange Facebook access token');
+      }
+
+      let userAccessToken = tokenData.access_token;
+
+      // 2. Exchange for 60-day long-lived access token
+      try {
+        const longLivedRes = await fetch(
+          `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`
+        );
+        const longLivedData = await longLivedRes.json();
+        if (longLivedData.access_token) {
+          userAccessToken = longLivedData.access_token;
+          expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
+        }
+      } catch (e) {
+        console.warn('Long lived exchange warning:', e);
+      }
+
+      // 3. Meta Page Access-Token Flow: strictly for Facebook Pages
+      const accountsRes = await fetch(
+        `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,category,tasks&access_token=${userAccessToken}`
+      );
+      const accountsData = await accountsRes.json();
+
+      if (accountsData.data && Array.isArray(accountsData.data) && accountsData.data.length > 0) {
+        const targetPage = accountsData.data.find(
+          (p: any) => p.tasks?.includes('CREATE_CONTENT') || p.tasks?.includes('MANAGE')
+        ) || accountsData.data[0];
+
+        accountId = targetPage.id;
+        clientName = targetPage.name;
+        accessToken = targetPage.access_token || userAccessToken;
+      } else {
+        const meRes = await fetch(`https://graph.facebook.com/v22.0/me?access_token=${userAccessToken}`);
+        const meData = await meRes.json();
+        accountId = meData.id || `meta-${Date.now()}`;
+        clientName = meData.name || 'Facebook Page';
+        accessToken = userAccessToken;
       }
     } else if (platformKey === 'youtube') {
       const { clientId, clientSecret } = getCleanGoogleCredentials();
@@ -374,7 +461,7 @@ export async function GET(
       if (stateUserId && targetAccountId) {
         await addAccountToUser(stateUserId, {
           id: targetAccountId,
-          clientName: clientName || (platformKey === 'facebook' ? 'Facebook Page' : 'Instagram Account'),
+          clientName: clientName || (platformKey === 'facebook' ? 'Facebook Page' : platformKey === 'threads' ? 'Threads Account' : 'Instagram Account'),
           platform: formattedPlatform as any,
           connectionType: 'oauth',
           connectionStatus: 'Connected',
@@ -384,95 +471,6 @@ export async function GET(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
-      }
-
-      // 2B. If Meta returned a linked Instagram account, auto-link it in 1-click!
-      if (linkedIgAccount?.id && platformKey === 'facebook') {
-        const igClientName = linkedIgAccount.username || linkedIgAccount.name || clientName;
-        const igAccId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `acc-ig-${Date.now()}`;
-        try {
-          const { data: existingIg } = await supabase
-            .from('accounts')
-            .select('id')
-            .eq('client_name', igClientName)
-            .eq('platform', 'Instagram')
-            .maybeSingle();
-
-          const igPayload: any = {
-            client_name: igClientName,
-            platform: 'Instagram',
-            connection_type: 'oauth',
-            connection_status: 'Connected',
-            oauth_access_token: accessToken,
-            oauth_account_id: linkedIgAccount.id,
-            oauth_token_expires_at: expiresAt,
-            updated_at: new Date().toISOString(),
-          };
-          if (clientId) igPayload.client_id = clientId;
-
-          if (existingIg?.id) {
-            await supabase.from('accounts').update(igPayload).eq('id', existingIg.id);
-          } else {
-            await supabase.from('accounts').insert({
-              id: igAccId,
-              created_at: new Date().toISOString(),
-              ...igPayload,
-            });
-          }
-
-          if (stateUserId) {
-            await addAccountToUser(stateUserId, {
-              id: existingIg?.id || igAccId,
-              clientName: igClientName,
-              platform: 'Instagram',
-              connectionType: 'oauth',
-              connectionStatus: 'Connected',
-              oauthAccountId: linkedIgAccount.id,
-              oauthAccessToken: accessToken,
-              oauthTokenExpiresAt: expiresAt || undefined,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
-          }
-        } catch (igLinkErr) {
-          console.warn('[Auto-link IG warning]:', igLinkErr);
-        }
-
-        // 2C. Also auto-link Threads under the same Meta OAuth identity!
-        try {
-          const threadsClientName = linkedIgAccount.username || linkedIgAccount.name || clientName;
-          const { data: existingThreads } = await supabase
-            .from('accounts')
-            .select('id')
-            .eq('client_name', threadsClientName)
-            .eq('platform', 'Threads')
-            .maybeSingle();
-
-          const threadsPayload: any = {
-            client_name: threadsClientName,
-            platform: 'Threads',
-            connection_type: 'oauth',
-            connection_status: 'Connected',
-            oauth_access_token: accessToken,
-            oauth_account_id: linkedIgAccount.id,
-            oauth_token_expires_at: expiresAt,
-            updated_at: new Date().toISOString(),
-          };
-          if (clientId) threadsPayload.client_id = clientId;
-
-          if (existingThreads?.id) {
-            await supabase.from('accounts').update(threadsPayload).eq('id', existingThreads.id);
-          } else {
-            const threadsAccId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `acc-threads-${Date.now()}`;
-            await supabase.from('accounts').insert({
-              id: threadsAccId,
-              created_at: new Date().toISOString(),
-              ...threadsPayload,
-            });
-          }
-        } catch (threadsLinkErr) {
-          console.warn('[Auto-link Threads warning]:', threadsLinkErr);
-        }
       }
 
       // 3. Log to audit trail

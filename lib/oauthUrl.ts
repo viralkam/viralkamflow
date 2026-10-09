@@ -65,6 +65,14 @@ export function getInstagramOAuthRedirectUri(request?: NextRequest): string {
 }
 
 /**
+ * Distinct, isolated callback URL for Threads OAuth.
+ */
+export function getThreadsOAuthRedirectUri(request?: NextRequest): string {
+  const base = getAppBaseUrl(request);
+  return `${base}/api/oauth/threads/callback`;
+}
+
+/**
  * Distinct, isolated callback URL for YouTube OAuth.
  */
 export function getYouTubeOAuthRedirectUri(request?: NextRequest): string {
@@ -79,6 +87,7 @@ export function getOAuthRedirectUri(platform: string, request?: NextRequest): st
   const key = platform.toLowerCase();
   if (key === 'facebook') return getFacebookOAuthRedirectUri(request);
   if (key === 'instagram') return getInstagramOAuthRedirectUri(request);
+  if (key === 'threads') return getThreadsOAuthRedirectUri(request);
   if (key === 'youtube') return getYouTubeOAuthRedirectUri(request);
 
   const base = getAppBaseUrl(request);
