@@ -172,7 +172,11 @@ export async function POST(request: NextRequest) {
               access_token: accessToken,
             };
 
-            const initRes = await fetch(`https://graph.facebook.com/v22.0/${igUserId}/media`, {
+            const isDirectIg = accessToken.startsWith('IG');
+            const igHost = isDirectIg ? 'graph.instagram.com' : 'graph.facebook.com';
+            const igTarget = isDirectIg ? 'me' : igUserId;
+
+            const initRes = await fetch(`https://${igHost}/v22.0/${igTarget}/media`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(containerBody),
@@ -188,7 +192,7 @@ export async function POST(request: NextRequest) {
             for (let i = 0; i < 20; i++) {
               await new Promise((r) => setTimeout(r, 3000));
               const statusRes = await fetch(
-                `https://graph.facebook.com/v22.0/${containerId}?fields=status_code,status&access_token=${accessToken}`
+                `https://${igHost}/v22.0/${containerId}?fields=status_code,status&access_token=${accessToken}`
               );
               const statusData = await statusRes.json();
               if (statusData.status_code === 'FINISHED') {
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            const pubRes = await fetch(`https://graph.facebook.com/v22.0/${igUserId}/media_publish`, {
+            const pubRes = await fetch(`https://${igHost}/v22.0/${igTarget}/media_publish`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ creation_id: containerId, access_token: accessToken }),

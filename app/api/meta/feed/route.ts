@@ -61,29 +61,53 @@ export async function GET(req: NextRequest) {
           // 1. Fetch Instagram Live Media
           if ((requestedPlatform === 'all' || requestedPlatform === 'instagram') && acc.platform === 'Instagram') {
             const igUserId = oauthAccountId || 'me';
-            const igRes = await fetch(
-              `https://graph.facebook.com/v22.0/${igUserId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit=25&access_token=${accessToken}`
-            );
-            const igData = await igRes.json();
+            let igItems: any[] = [];
 
-            if (igData.data && Array.isArray(igData.data)) {
-              for (const item of igData.data) {
-                liveItems.push({
-                  id: item.id,
-                  platform: 'Instagram',
-                  caption: item.caption || '',
-                  mediaType: item.media_type === 'VIDEO' ? 'video' : 'image',
-                  mediaUrl: item.media_url || item.thumbnail_url,
-                  thumbnailUrl: item.thumbnail_url || item.media_url,
-                  permalink: item.permalink,
-                  likeCount: item.like_count || 0,
-                  commentCount: item.comments_count || 0,
-                  shareCount: 0,
-                  viewCount: 0,
-                  publishedAt: item.timestamp || new Date().toISOString(),
-                  accountName: acc.clientName || (acc as any).client_name || 'Instagram',
-                });
+            // Direct Instagram Login tokens start with IGAA/IG and query graph.instagram.com
+            const isDirectIg = accessToken.startsWith('IG');
+            const primaryHost = isDirectIg ? 'graph.instagram.com' : 'graph.facebook.com';
+            const fallbackHost = isDirectIg ? 'graph.facebook.com' : 'graph.instagram.com';
+
+            try {
+              const primaryUrl = `https://${primaryHost}/v22.0/${isDirectIg ? 'me' : igUserId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit=25&access_token=${accessToken}`;
+              const primaryRes = await fetch(primaryUrl);
+              const primaryData = await primaryRes.json();
+              if (primaryData.data && Array.isArray(primaryData.data)) {
+                igItems = primaryData.data;
               }
+            } catch (err) {
+              console.warn('[Feed] Primary Instagram fetch failed:', err);
+            }
+
+            if (igItems.length === 0) {
+              try {
+                const fallbackUrl = `https://${fallbackHost}/v22.0/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit=25&access_token=${accessToken}`;
+                const fallbackRes = await fetch(fallbackUrl);
+                const fallbackData = await fallbackRes.json();
+                if (fallbackData.data && Array.isArray(fallbackData.data)) {
+                  igItems = fallbackData.data;
+                }
+              } catch (err) {
+                console.warn('[Feed] Fallback Instagram fetch failed:', err);
+              }
+            }
+
+            for (const item of igItems) {
+              liveItems.push({
+                id: item.id,
+                platform: 'Instagram',
+                caption: item.caption || '',
+                mediaType: item.media_type === 'VIDEO' ? 'video' : 'image',
+                mediaUrl: item.media_url || item.thumbnail_url,
+                thumbnailUrl: item.thumbnail_url || item.media_url,
+                permalink: item.permalink,
+                likeCount: item.like_count || 0,
+                commentCount: item.comments_count || 0,
+                shareCount: 0,
+                viewCount: 0,
+                publishedAt: item.timestamp || new Date().toISOString(),
+                accountName: acc.clientName || (acc as any).client_name || 'Instagram',
+              });
             }
           }
 
