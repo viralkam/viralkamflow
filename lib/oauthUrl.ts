@@ -58,18 +58,18 @@ export function getFacebookOAuthRedirectUri(request?: NextRequest): string {
 
 /**
  * Distinct, isolated callback URL for Instagram OAuth.
+ * Instagram strictly enforces HTTPS and only allows whitelisted production callback URIs.
  */
 export function getInstagramOAuthRedirectUri(request?: NextRequest): string {
-  const base = getAppBaseUrl(request);
-  return `${base}/api/oauth/instagram/callback`;
+  return `${CANONICAL_APP_BASE_URL}/api/oauth/instagram/callback`;
 }
 
 /**
  * Distinct, isolated callback URL for Threads OAuth.
+ * Threads strictly enforces HTTPS and only allows whitelisted production callback URIs.
  */
 export function getThreadsOAuthRedirectUri(request?: NextRequest): string {
-  const base = getAppBaseUrl(request);
-  return `${base}/api/oauth/threads/callback`;
+  return `${CANONICAL_APP_BASE_URL}/api/oauth/threads/callback`;
 }
 
 /**
