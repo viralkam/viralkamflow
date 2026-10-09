@@ -126,9 +126,10 @@ export function getCleanMetaCredentials(): { clientId: string; clientSecret?: st
 }
 
 /**
- * Verified Instagram App ID from Meta Instagram Business Login.
+ * Verified Instagram App ID and Secret from Meta Instagram Business Login.
  */
 export const VERIFIED_INSTAGRAM_APP_ID = '1373462491434641';
+export const VERIFIED_INSTAGRAM_APP_SECRET = '7e964b60d0af60e492b06eb51c6256b6';
 
 /**
  * Resolves Instagram specific App credentials (Instagram App ID & Secret).
@@ -143,12 +144,10 @@ export function getCleanInstagramCredentials(): { clientId: string; clientSecret
   const rawSecret = (
     process.env.INSTAGRAM_CLIENT_SECRET ||
     process.env.INSTAGRAM_APP_SECRET ||
-    process.env.META_CLIENT_SECRET ||
-    process.env.META_APP_SECRET ||
-    VERIFIED_META_APP_SECRET
+    VERIFIED_INSTAGRAM_APP_SECRET
   )?.trim().replace(/^["']|["']$/g, '');
 
-  return { clientId: rawId || VERIFIED_INSTAGRAM_APP_ID, clientSecret: rawSecret };
+  return { clientId: rawId || VERIFIED_INSTAGRAM_APP_ID, clientSecret: rawSecret || VERIFIED_INSTAGRAM_APP_SECRET };
 }
 
 /**

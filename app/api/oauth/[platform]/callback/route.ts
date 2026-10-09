@@ -80,7 +80,7 @@ export async function GET(
           // Exchange for 60-day long-lived token
           try {
             const longLivedRes = await fetch(
-              `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${igAccessToken}`
+              `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${igClientSecret || metaClientSecret}&access_token=${igAccessToken}`
             );
             const longLivedData = await longLivedRes.json();
             if (longLivedData.access_token) {
