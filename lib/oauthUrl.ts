@@ -126,6 +126,32 @@ export function getCleanMetaCredentials(): { clientId: string; clientSecret?: st
 }
 
 /**
+ * Verified Instagram App ID from Meta Instagram Business Login.
+ */
+export const VERIFIED_INSTAGRAM_APP_ID = '1373462491434641';
+
+/**
+ * Resolves Instagram specific App credentials (Instagram App ID & Secret).
+ */
+export function getCleanInstagramCredentials(): { clientId: string; clientSecret?: string } {
+  const rawId = (
+    process.env.INSTAGRAM_CLIENT_ID ||
+    process.env.INSTAGRAM_APP_ID ||
+    VERIFIED_INSTAGRAM_APP_ID
+  )?.trim().replace(/^["']|["']$/g, '');
+
+  const rawSecret = (
+    process.env.INSTAGRAM_CLIENT_SECRET ||
+    process.env.INSTAGRAM_APP_SECRET ||
+    process.env.META_CLIENT_SECRET ||
+    process.env.META_APP_SECRET ||
+    VERIFIED_META_APP_SECRET
+  )?.trim().replace(/^["']|["']$/g, '');
+
+  return { clientId: rawId || VERIFIED_INSTAGRAM_APP_ID, clientSecret: rawSecret };
+}
+
+/**
  * Verified permissions for Facebook Page connection, content publishing, and Auto-Reply.
  */
 export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_manage_posts';

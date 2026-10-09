@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { logAudit } from '@/lib/auditLogger';
-import { getOAuthRedirectUri, getCleanMetaCredentials, getCleanGoogleCredentials } from '@/lib/oauthUrl';
+import { getOAuthRedirectUri, getCleanMetaCredentials, getCleanInstagramCredentials, getCleanGoogleCredentials } from '@/lib/oauthUrl';
 import { addAccountToUser } from '@/lib/userStore';
 
 /**
@@ -53,13 +53,8 @@ export async function GET(
     let linkedIgAccount: { id: string; username?: string; name?: string } | null = null;
 
     if (platformKey === 'instagram') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
-
-      if (!clientId || !clientSecret) {
-        return NextResponse.redirect(
-          new URL(`/connect?error=oauth_not_configured&platform=instagram`, request.url)
-        );
-      }
+      const { clientId: igClientId, clientSecret: igClientSecret } = getCleanInstagramCredentials();
+      const { clientId: metaClientId, clientSecret: metaClientSecret } = getCleanMetaCredentials();
 
       let igExchangeSuccess = false;
 
@@ -69,8 +64,8 @@ export async function GET(
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
+            client_id: igClientId,
+            client_secret: igClientSecret || metaClientSecret || '',
             grant_type: 'authorization_code',
             redirect_uri: redirectUri,
             code,
@@ -119,9 +114,9 @@ export async function GET(
       // 2. If direct exchange did not succeed, fallback to Meta Facebook Graph API exchange
       if (!igExchangeSuccess) {
         const tokenRes = await fetch(
-          `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+          `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${metaClientId}&redirect_uri=${encodeURIComponent(
             redirectUri
-          )}&client_secret=${clientSecret}&code=${code}`
+          )}&client_secret=${metaClientSecret}&code=${code}`
         );
         const tokenData = await tokenRes.json();
 
@@ -133,7 +128,7 @@ export async function GET(
 
         try {
           const longLivedRes = await fetch(
-            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`
+            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaClientId}&client_secret=${metaClientSecret}&fb_exchange_token=${userAccessToken}`
           );
           const longLivedData = await longLivedRes.json();
           if (longLivedData.access_token) {

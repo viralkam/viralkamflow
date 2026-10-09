@@ -5,6 +5,7 @@ import {
   getYouTubeOAuthRedirectUri,
   getOAuthRedirectUri,
   getCleanMetaCredentials,
+  getCleanInstagramCredentials,
   getCleanGoogleCredentials,
   buildFacebookOAuthUrl,
 } from '@/lib/oauthUrl';
@@ -49,18 +50,16 @@ export async function GET(
   }
 
   if (platformKey === 'instagram') {
-    const { clientId, clientSecret } = getCleanMetaCredentials();
-
-    if (!clientId || !clientSecret) {
-      return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
-      );
-    }
-
     const redirectUri = getInstagramOAuthRedirectUri(request);
     const mode = searchParams.get('mode'); // 'instagram_login' (default) or 'meta_dialog'
 
     if (mode === 'meta_dialog') {
+      const { clientId, clientSecret } = getCleanMetaCredentials();
+      if (!clientId || !clientSecret) {
+        return NextResponse.redirect(
+          new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
+        );
+      }
       // Instagram Graph API via Meta Facebook Dialog
       const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
       const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
@@ -69,7 +68,14 @@ export async function GET(
       return NextResponse.redirect(authUrl);
     }
 
-    // Direct Instagram OAuth (Instagram Login for Professionals / Business)
+    // Direct Instagram OAuth (Instagram Login for Professionals / Business) uses Instagram App ID
+    const { clientId, clientSecret } = getCleanInstagramCredentials();
+    if (!clientId) {
+      return NextResponse.redirect(
+        new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
+      );
+    }
+
     const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
     const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
