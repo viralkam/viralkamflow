@@ -69,7 +69,7 @@ export async function GET(
       }
       const scopeLevel = searchParams.get('scopeLevel') || searchParams.get('scope');
       const basicScopes = 'public_profile,instagram_basic,pages_show_list,pages_read_engagement';
-      const fullScopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+      const fullScopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging';
       const scopes = scopeLevel === 'basic' ? basicScopes : fullScopes;
 
       const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(

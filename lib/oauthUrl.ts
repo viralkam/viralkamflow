@@ -187,7 +187,7 @@ export function getCleanThreadsCredentials(): { clientId: string; clientSecret?:
  * Standard Facebook OAuth Scopes for Page connection, posting & Auto-Reply.
  * (pages_manage_posts is deprecated/rejected by Meta v19+, replaced by active scopes)
  */
-export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_read_engagement,pages_messaging,pages_read_user_content,pages_manage_metadata';
+export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_read_engagement,pages_messaging,pages_manage_metadata';
 
 export function getFacebookScopes(): string {
   return readEnvKey('FACEBOOK_SCOPES') || readEnvKey('META_FACEBOOK_SCOPES') || DEFAULT_FACEBOOK_SCOPES;
