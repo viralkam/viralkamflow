@@ -5,7 +5,6 @@ import {
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
-  getCleanGoogleCredentials,
 } from '@/lib/oauthUrl';
 
 /**
@@ -15,13 +14,11 @@ import {
  * - Facebook
  * - Instagram
  * - Threads
- * - YouTube
  */
 export async function GET() {
   const fb = getCleanFacebookCredentials();
   const ig = getCleanInstagramCredentials();
   const th = getCleanThreadsCredentials();
-  const yt = getCleanGoogleCredentials();
 
   return NextResponse.json({
     facebook: {
@@ -35,10 +32,6 @@ export async function GET() {
     threads: {
       appId: th.clientId || '',
       hasSecret: Boolean(th.clientSecret),
-    },
-    youtube: {
-      appId: yt.clientId || '',
-      hasSecret: Boolean(yt.clientSecret),
     },
   });
 }
@@ -69,9 +62,6 @@ export async function POST(req: NextRequest) {
 
     if (body.threadsAppId) updateEnvVar('THREADS_APP_ID', body.threadsAppId);
     if (body.threadsAppSecret) updateEnvVar('THREADS_APP_SECRET', body.threadsAppSecret);
-
-    if (body.googleClientId) updateEnvVar('GOOGLE_CLIENT_ID', body.googleClientId);
-    if (body.googleClientSecret) updateEnvVar('GOOGLE_CLIENT_SECRET', body.googleClientSecret);
 
     fs.writeFileSync(envPath, envContent.trim() + '\n', 'utf8');
 

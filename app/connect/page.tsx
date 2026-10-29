@@ -10,7 +10,6 @@ import {
   FacebookIcon,
   FacebookFilledIcon,
   ThreadsIcon,
-  YouTubeIcon,
 } from '@/components/PlatformIcons';
 import {
   CheckCircle2,
@@ -53,12 +52,10 @@ function ConnectContent() {
     facebook: { appId: string; hasSecret: boolean };
     instagram: { appId: string; hasSecret: boolean };
     threads: { appId: string; hasSecret: boolean };
-    youtube: { appId: string; hasSecret: boolean };
   }>({
     facebook: { appId: '', hasSecret: false },
     instagram: { appId: '', hasSecret: false },
     threads: { appId: '', hasSecret: false },
-    youtube: { appId: '', hasSecret: false },
   });
 
   // Form inputs for updating keys
@@ -152,7 +149,6 @@ function ConnectContent() {
   const igAccounts = connectedAccounts.filter((a) => a.platform === 'Instagram');
   const fbAccounts = connectedAccounts.filter((a) => a.platform === 'Facebook');
   const thAccounts = connectedAccounts.filter((a) => a.platform === 'Threads');
-  const ytAccounts = connectedAccounts.filter((a) => a.platform === 'YouTube');
 
   const handleDisconnect = async (id: string, platformName: string) => {
     if (confirm(`Disconnect ${platformName} account?`)) {
@@ -185,7 +181,7 @@ function ConnectContent() {
               Connect Social Channels
             </h1>
             <p className="page-desc" style={{ color: 'var(--text-dim)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-              Connect Facebook, Instagram, Threads &amp; YouTube individually with dedicated apps
+              Connect Facebook, Instagram &amp; Threads individually with dedicated apps
             </p>
           </div>
         </div>
@@ -830,118 +826,6 @@ function ConnectContent() {
                     </span>
                     <button
                       onClick={() => handleDisconnect(acc.id, 'Threads')}
-                      className="btn btn-ghost btn-sm"
-                      style={{ color: 'var(--danger)' }}
-                      title="Disconnect"
-                    >
-                      <Trash2 size={14} />
-                      <span>Disconnect</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 4. YOUTUBE CARD */}
-        <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid #ef4444' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div
-                style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '14px',
-                  background: '#fef2f2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#dc2626',
-                }}
-              >
-                <YouTubeIcon size={26} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>YouTube</h3>
-                  <span
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      background: '#fee2e2',
-                      color: '#dc2626',
-                    }}
-                  >
-                    Google OAuth
-                  </span>
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Connect your YouTube channel to schedule video uploads &amp; YouTube Shorts
-                </p>
-              </div>
-            </div>
-
-            <a
-              href="/api/oauth/youtube?userId=admin"
-              className="btn btn-primary"
-              style={{ background: '#dc2626', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
-            >
-              <Link2 size={17} />
-              <span>{ytAccounts.length > 0 ? 'Add / Reconnect YouTube' : 'Connect YouTube'}</span>
-            </a>
-          </div>
-
-          {/* YouTube Connected List */}
-          {ytAccounts.length > 0 && (
-            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-                Connected YouTube Channels ({ytAccounts.length}):
-              </span>
-              {ytAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#dc2626',
-                      }}
-                    >
-                      <YouTubeIcon size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '0.92rem', color: 'var(--text-main)' }}>{acc.clientName}</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: '0.5rem' }}>
-                        Channel ID: {acc.oauthAccountId || acc.id}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span className="badge badge-success">
-                      <CheckCircle2 size={10} /> Active
-                    </span>
-                    <button
-                      onClick={() => handleDisconnect(acc.id, 'YouTube')}
                       className="btn btn-ghost btn-sm"
                       style={{ color: 'var(--danger)' }}
                       title="Disconnect"

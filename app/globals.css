@@ -519,11 +519,6 @@ button, input, textarea, select {
   font-size: 0.78rem;
   font-weight: 600;
 }
-.platform-pill-youtube {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
 .platform-pill-facebook {
   background: #eff6ff;
   color: #1d4ed8;

@@ -3,7 +3,6 @@ import {
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
-  getCleanGoogleCredentials,
 } from '@/lib/oauthUrl';
 
 /**
@@ -15,23 +14,19 @@ export async function GET() {
   const fb = getCleanFacebookCredentials();
   const ig = getCleanInstagramCredentials();
   const th = getCleanThreadsCredentials();
-  const yt = getCleanGoogleCredentials();
 
   const hasFacebook = Boolean(fb.clientId && fb.clientSecret);
   const hasInstagram = Boolean(ig.clientId && ig.clientSecret);
   const hasThreads = Boolean(th.clientId && th.clientSecret);
-  const hasYouTube = Boolean(yt.clientId && yt.clientSecret);
 
   return NextResponse.json({
     configured: {
       facebook: hasFacebook,
       instagram: hasInstagram,
       threads: hasThreads,
-      youtube: hasYouTube,
     },
     facebookConfigured: hasFacebook,
     instagramConfigured: hasInstagram,
     threadsConfigured: hasThreads,
-    googleConfigured: hasYouTube,
   });
 }

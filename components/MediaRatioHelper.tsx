@@ -64,7 +64,7 @@ export function MediaRatioHelper({
     if (Math.abs(r - 1.0) < 0.05) return '1:1 Square';
     if (Math.abs(r - 0.8) < 0.05) return '4:5 Portrait (IG Feed)';
     if (Math.abs(r - 9 / 16) < 0.05) return '9:16 Vertical (Reel/Story)';
-    if (Math.abs(r - 16 / 9) < 0.05) return '16:9 Landscape (YouTube/FB)';
+    if (Math.abs(r - 16 / 9) < 0.05) return '16:9 Landscape (Facebook)';
     if (r < 0.8) return `${r.toFixed(2)}:1 Tall`;
     return `${r.toFixed(2)}:1 Wide`;
   };

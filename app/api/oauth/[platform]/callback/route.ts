@@ -6,7 +6,6 @@ import {
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
-  getCleanGoogleCredentials,
 } from '@/lib/oauthUrl';
 import { addAccountToUser } from '@/lib/userStore';
 
@@ -256,52 +255,6 @@ export async function GET(
         clientName = meData.name || 'Facebook Page';
         accessToken = userAccessToken;
       }
-    } else if (platformKey === 'youtube') {
-      const { clientId, clientSecret } = getCleanGoogleCredentials();
-
-      if (!clientId || !clientSecret) {
-        return NextResponse.redirect(
-          new URL(`/connect?error=oauth_not_configured&platform=youtube`, request.url)
-        );
-      }
-
-      // Exchange code for tokens via Google OAuth token endpoint
-      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-        }),
-      });
-
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok || !tokenData.access_token) {
-        throw new Error(tokenData.error_description || 'Failed to exchange Google access token');
-      }
-
-      accessToken = tokenData.access_token;
-      if (tokenData.refresh_token) {
-        refreshToken = tokenData.refresh_token;
-      }
-      if (tokenData.expires_in) {
-        expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-      }
-
-      // Fetch channel details
-      const channelRes = await fetch(
-        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
-      );
-      const channelData = await channelRes.json();
-      const firstChannel = channelData.items?.[0];
-      accountId = firstChannel?.id || `yt-${Date.now()}`;
-      clientName = firstChannel?.snippet?.title || 'YouTube Channel';
     } else if (platformKey === 'threads') {
       const { clientId, clientSecret } = getCleanThreadsCredentials();
 
@@ -364,7 +317,7 @@ export async function GET(
     }
 
     const supabase = createServerSupabaseClient();
-    const formattedPlatform = platformKey === 'instagram' ? 'Instagram' : platformKey === 'facebook' ? 'Facebook' : platformKey === 'threads' ? 'Threads' : 'YouTube';
+    const formattedPlatform = platformKey === 'instagram' ? 'Instagram' : platformKey === 'facebook' ? 'Facebook' : 'Threads';
 
     if (supabase) {
       // 1. Normalize client into clients table

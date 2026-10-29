@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Platform } from '@/types';
-import { InstagramIcon, FacebookIcon, YouTubeIcon, ThreadsIcon } from './PlatformIcons';
+import { InstagramIcon, FacebookIcon, ThreadsIcon } from './PlatformIcons';
 import { 
   Heart, 
   MessageCircle, 
@@ -72,7 +72,7 @@ export function SocialPreviewCard({
 
         {/* Platform Switcher Pills */}
         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-          {(['Instagram', 'Facebook', 'Threads', 'YouTube'] as Platform[]).map((p) => (
+          {(['Instagram', 'Facebook', 'Threads'] as Platform[]).map((p) => (
             <button
               key={p}
               type="button"
@@ -95,7 +95,6 @@ export function SocialPreviewCard({
               {p === 'Instagram' && <InstagramIcon size={12} />}
               {p === 'Facebook' && <FacebookIcon size={12} />}
               {p === 'Threads' && <ThreadsIcon size={12} />}
-              {p === 'YouTube' && <YouTubeIcon size={12} />}
               <span>{p}</span>
             </button>
           ))}
@@ -325,80 +324,6 @@ export function SocialPreviewCard({
                 <Send size={16} />
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= YOUTUBE PREVIEW ================= */}
-      {activeTab === 'YouTube' && (
-        <div className="mockup-youtube" style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-        }}>
-          {/* Video Player Frame */}
-          <div style={{
-            width: '100%',
-            aspectRatio: '16 / 9',
-            background: '#0f172a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-          }}>
-            {mediaUrl ? (
-              mediaType === 'video' ? (
-                <video src={mediaUrl} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={mediaUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              )
-            ) : (
-              <div style={{ textAlign: 'center', color: '#64748b' }}>
-                <YouTubeIcon size={40} />
-                <p style={{ fontSize: '0.75rem', marginTop: '0.4rem', color: '#94a3b8' }}>YouTube Player Preview</p>
-              </div>
-            )}
-          </div>
-
-          <div style={{ padding: '0.85rem' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem', lineHeight: 1.3 }}>
-              {title || 'Your Video Title Goes Here'}
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-              <div style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                background: '#ff0000',
-                color: '#fff',
-                fontSize: '0.7rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700
-              }}>
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>{displayName}</span>
-              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>· 10K subscribers</span>
-            </div>
-
-            <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, maxHeight: '60px', overflow: 'hidden', whiteSpace: 'pre-wrap' }}>
-              {caption || description || 'Add description, timestamps and keywords...'}
-            </p>
-
-            {tags.length > 0 && (
-              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                {tags.slice(0, 5).map((t, idx) => (
-                  <span key={idx} style={{ fontSize: '0.7rem', color: '#2563eb', background: '#eff6ff', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                    #{t.replace(/^#/, '')}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}

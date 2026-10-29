@@ -1,4 +1,4 @@
-export type Platform = 'Instagram' | 'Facebook' | 'Threads' | 'YouTube';
+export type Platform = 'Instagram' | 'Facebook' | 'Threads';
 
 export type ConnectionStatus = 'Connected' | 'Disconnected' | 'Pending';
 
@@ -83,5 +83,5 @@ export interface AuditLog {
 export interface OAuthProviderStatus {
   instagram: boolean;
   facebook: boolean;
-  youtube: boolean;
+  threads: boolean;
 }

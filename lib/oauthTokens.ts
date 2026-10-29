@@ -4,7 +4,6 @@ import {
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
-  getCleanGoogleCredentials,
 } from './oauthUrl';
 
 /**
@@ -12,7 +11,7 @@ import {
  * 
  * CRITICAL SECURITY:
  * - Tokens and secrets NEVER leave the server.
- * - Auto-refreshes Google and Meta tokens when expired or nearing expiration.
+ * - Auto-refreshes Meta and Threads tokens when expired or nearing expiration.
  */
 export async function getValidAccessToken(accountId: string): Promise<{
   accessToken: string;
@@ -62,44 +61,7 @@ export async function getValidAccessToken(accountId: string): Promise<{
   let newExpiresAt: string | null = null;
 
   try {
-    if (account.platform === 'YouTube') {
-      const { clientId, clientSecret } = getCleanGoogleCredentials();
-      const refreshToken = account.oauth_refresh_token;
-
-      if (!clientId || !clientSecret) {
-        throw new Error('Missing Google OAuth client credentials.');
-      }
-
-      if (!refreshToken) {
-        // If no refresh token exists, use existing token or prompt re-auth
-        return {
-          accessToken: account.oauth_access_token,
-          platform: account.platform,
-          oauthAccountId: account.oauth_account_id,
-          clientName: account.client_name,
-        };
-      }
-
-      console.log(`[OAuth Auto-Refresh]: Refreshing Google access token for account ${account.client_name}...`);
-      const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
-        }),
-      });
-
-      const refreshData = await refreshRes.json();
-      if (!refreshRes.ok || !refreshData.access_token) {
-        throw new Error(refreshData.error_description || 'Failed to refresh Google token');
-      }
-
-      refreshedToken = refreshData.access_token;
-      newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
-    } else if (account.platform === 'Facebook') {
+    if (account.platform === 'Facebook') {
       const { clientId, clientSecret } = getCleanFacebookCredentials();
 
       if (!clientId || !clientSecret) {

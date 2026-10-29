@@ -121,6 +121,7 @@ export async function processCommentForAutoReply(
   let dmSuccess = false;
   let dmError: string | undefined;
 
+  try {
     // 5.5 Follower Gate Check (if enabled on rule)
     let isFollower = true;
     const followerGateActive = Boolean(matchedRule.requireFollower);

@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getFacebookOAuthRedirectUri,
   getInstagramOAuthRedirectUri,
-  getYouTubeOAuthRedirectUri,
   getThreadsOAuthRedirectUri,
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
-  getCleanGoogleCredentials,
   getFacebookScopes,
   getInstagramScopes,
   getThreadsScopes,
@@ -103,26 +101,6 @@ export async function GET(
     const authUrl = `https://threads.net/oauth/authorize?client_id=${clientId}&app_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
-
-    return NextResponse.redirect(authUrl);
-  }
-
-  // 4. YOUTUBE OAUTH
-  if (platformKey === 'youtube') {
-    const { clientId, clientSecret } = getCleanGoogleCredentials();
-
-    if (!clientId || !clientSecret) {
-      return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=youtube', request.url)
-      );
-    }
-
-    const redirectUri = getYouTubeOAuthRedirectUri(request);
-    const scope = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent${stateQuery}`;
 
     return NextResponse.redirect(authUrl);
   }

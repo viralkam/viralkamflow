@@ -23,7 +23,6 @@ export interface PublishResult {
  * - Instagram Professional / Business:
  *     - Single Photos (valid aspect ratio 4:5 to 1.91:1)
  *     - Reels / Videos (9:16 vertical or 4:5 to 16:9, with container status polling)
- * - YouTube: Resumable Video Publishing
  * - Meta Aspect Ratio Error Detection & User-Friendly Hindi/English Explanations
  */
 export async function executePublishPost(postId: string): Promise<PublishResult> {
@@ -334,107 +333,33 @@ export async function executePublishPost(postId: string): Promise<PublishResult>
 
       externalPostId = publishData.id;
     }
-    // -------------------------------------------------------------
-    // YOUTUBE PUBLISHING
-    // -------------------------------------------------------------
-    else if (account.platform === 'YouTube') {
-      if (!hasMedia || !isVideo) {
-        throw new Error('YouTube par post karne ke liye video file (.mp4, .mov) hona zaroori hai. Text-only ya photo post YouTube API allow nahi karta. Kripya video file attach karein.');
-      }
-
-      const snippet = {
-        title: post.title || 'Untitled YouTube Video',
-        description: `${post.caption || ''}\n\n${post.description || ''}`.trim(),
-        tags: ['PublishingFlow'],
-        categoryId: '22',
-      };
-      const status = {
-        privacyStatus: 'public',
-        selfDeclaredMadeForKids: false,
-      };
-
-      const ytInitRes = await fetch(
-        'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'X-Upload-Content-Type': 'video/*',
-          },
-          body: JSON.stringify({ snippet, status }),
-        }
-      );
-
-      if (!ytInitRes.ok) {
-        const ytErrData = await ytInitRes.json().catch(() => ({}));
-        const reason = ytErrData.error?.errors?.[0]?.reason || '';
-        const apiMsg = ytErrData.error?.message || '';
-
-        if (reason === 'youtubeSignupRequired' || apiMsg.toLowerCase().includes('channel')) {
-          throw new Error('Is Google account par YouTube Channel create nahi hai. Kripya youtube.com par jakar apne profile icon se "Create a channel" karein aur dobara connect karein.');
-        }
-
-        if (ytInitRes.status === 401) {
-          throw new Error('YouTube Authorization failed (Unauthorized 401). Kripya check karein: 1) Google Cloud Console me "YouTube Data API v3" ENABLED hai ya nahi. 2) youtube.com par channel bana hai ya nahi. 3) Accounts page par YouTube ko Reconnect karein.');
-        }
-
-        throw new Error(apiMsg || `YouTube API error (status ${ytInitRes.status})`);
-      }
-
-      const resumableUploadUrl = ytInitRes.headers.get('location');
-      externalPostId = resumableUploadUrl || `yt-pub-${Date.now()}`;
-
-      // Upload the actual video binary stream to YouTube resumable session
-      if (resumableUploadUrl && post.media_url) {
-        try {
-          const mediaFileRes = await fetch(post.media_url);
-          if (mediaFileRes.ok) {
-            const videoBuffer = await mediaFileRes.arrayBuffer();
-            const uploadRes = await fetch(resumableUploadUrl, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'video/*',
-                'Content-Length': videoBuffer.byteLength.toString(),
-              },
-              body: videoBuffer,
-            });
-            const uploadedVideoData = await uploadRes.json().catch(() => ({}));
-            if (uploadedVideoData?.id) {
-              externalPostId = uploadedVideoData.id;
-            }
-          }
-        } catch (uploadBinaryErr: any) {
-          console.warn('[YouTube Binary Upload Warning]:', uploadBinaryErr);
-          // Metadata was registered, keep upload URL or fallback ID
-        }
-      }
-    }
 
     // Success: Mark post as posted
     const publishedAt = new Date().toISOString();
-    await supabase
-      .from('posts')
-      .update({
-        status: 'posted',
-        published_at: publishedAt,
-        retry_count: 0,
-        last_error: null,
-        updated_at: publishedAt,
-      })
-      .eq('id', postId);
+    if (supabase) {
+      await supabase
+        .from('posts')
+        .update({
+          status: 'posted',
+          published_at: publishedAt,
+          retry_count: 0,
+          last_error: null,
+          updated_at: publishedAt,
+        })
+        .eq('id', postId);
 
-    // If media was a temporary transit file, purge it now that it is published (0 MB permanent storage)
-    if (post.media_url && post.media_url.includes('temp-transit/')) {
-      try {
-        const parts = post.media_url.split('/media/');
-        if (parts[1]) {
-          const path = decodeURIComponent(parts[1].split('?')[0]);
-          await supabase.storage.from('media').remove([path]);
-          console.log(`[Scheduled Zero-Storage Cleanup]: Purged transit file ${path}`);
+      // If media was a temporary transit file, purge it now that it is published (0 MB permanent storage)
+      if (post.media_url && post.media_url.includes('temp-transit/')) {
+        try {
+          const parts = post.media_url.split('/media/');
+          if (parts[1]) {
+            const path = decodeURIComponent(parts[1].split('?')[0]);
+            await supabase.storage.from('media').remove([path]);
+            console.log(`[Scheduled Zero-Storage Cleanup]: Purged transit file ${path}`);
+          }
+        } catch (cleanErr) {
+          console.warn('Transit purge warning:', cleanErr);
         }
-      } catch (cleanErr) {
-        console.warn('Transit purge warning:', cleanErr);
       }
     }
 

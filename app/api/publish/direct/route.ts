@@ -11,7 +11,6 @@ import { getUserData, saveUserData } from '@/lib/userStore';
  * ZERO SERVER DISK STORAGE & ZERO SUPABASE STORAGE:
  * - Instagram Reels: Streams video binary buffer directly to Instagram's server (rupload.facebook.com)
  * - Facebook Page: Streams directly to graph-video.facebook.com (natively scheduled on Meta)
- * - YouTube: Streams directly to YouTube Resumable upload session
  * - Threads: Streams directly to graph.threads.net
  * 
  * Video files are NEVER stored on user server or Supabase Storage!
@@ -356,62 +355,6 @@ export async function POST(request: NextRequest) {
               externalPostId = pubData.id;
             } else {
               externalPostId = creationId;
-            }
-          }
-          // -----------------------------------------------------------------
-          // 4. YOUTUBE (Direct Resumable Stream)
-          // -----------------------------------------------------------------
-          else if (account.platform === 'YouTube') {
-            if (!videoBuffer || !isVideo) {
-              throw new Error('YouTube publishing requires a video file.');
-            }
-
-            const ytStatus: Record<string, any> = {
-              privacyStatus: isScheduled ? 'private' : 'public',
-              selfDeclaredMadeForKids: false,
-            };
-            if (isScheduled && scheduledAtIso) {
-              ytStatus.publishAt = scheduledAtIso;
-            }
-
-            const ytInitRes = await fetch(
-              'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'X-Upload-Content-Type': 'video/*',
-                },
-                body: JSON.stringify({
-                  snippet: {
-                    title: title || 'Untitled Video',
-                    description: `${caption ? caption + '\n\n' : ''}${description}`.trim(),
-                    tags: tags.length > 0 ? tags : ['PublishingFlow'],
-                    categoryId: '22',
-                  },
-                  status: ytStatus,
-                }),
-              }
-            );
-
-            if (!ytInitRes.ok) {
-              const ytErr = await ytInitRes.json().catch(() => ({}));
-              throw new Error(ytErr.error?.message || 'YouTube upload session creation failed');
-            }
-
-            const resumableUrl = ytInitRes.headers.get('location');
-            if (resumableUrl) {
-              const ytUploadRes = await fetch(resumableUrl, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'video/*',
-                  'Content-Length': fileSizeBytes.toString(),
-                },
-                body: videoBuffer as unknown as BodyInit,
-              });
-              const ytData = await ytUploadRes.json().catch(() => ({}));
-              externalPostId = ytData.id || resumableUrl;
             }
           }
 

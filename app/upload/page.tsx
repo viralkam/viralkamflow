@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Platform } from '@/types';
-import { InstagramIcon, FacebookIcon, ThreadsIcon, YouTubeIcon } from '@/components/PlatformIcons';
+import { InstagramIcon, FacebookIcon, ThreadsIcon } from '@/components/PlatformIcons';
 import { SocialPreviewCard } from '@/components/SocialPreviewCard';
 import { MediaRatioHelper } from '@/components/MediaRatioHelper';
 import {
@@ -106,7 +106,7 @@ export default function UploadPage() {
   const connectedAccounts = accounts.filter(
     a => a.connectionStatus === 'Connected' &&
          a.connectionType === 'oauth' &&
-         (a.platform === 'Facebook' || a.platform === 'Instagram' || a.platform === 'Threads' || a.platform === 'YouTube')
+         (a.platform === 'Facebook' || a.platform === 'Instagram' || a.platform === 'Threads')
   );
 
   // Auto-select all connected accounts by default
@@ -213,7 +213,7 @@ export default function UploadPage() {
     setCaption(prev => prev ? `${prev} ${ht}` : ht);
   };
 
-  // Stream media directly: video buffer is streamed directly to Meta / Instagram / YouTube servers
+  // Stream media directly: video buffer is streamed directly to Meta / Instagram servers
   // ZERO server disk storage and ZERO Supabase storage used!
   const prepareMediaPayload = async (): Promise<{ mediaUrl?: string; fileToSend?: File }> => {
     if (mediaFile) {
@@ -380,7 +380,7 @@ export default function UploadPage() {
             Publishing Hub
           </h1>
           <p className="page-desc" style={{ color: 'var(--text-dim)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
-            Compose, preview across channels, and stream directly to Meta &amp; YouTube with zero storage cost.
+            Compose, preview across channels, and stream directly to Facebook &amp; Instagram with zero storage cost.
           </p>
         </div>
       </div>
@@ -415,7 +415,7 @@ export default function UploadPage() {
               }}>
                 <div>
                   <p style={{ fontWeight: 600, color: '#92400e', margin: 0 }}>No connected accounts found</p>
-                  <span style={{ fontSize: '0.82rem', color: '#b45309' }}>Connect Facebook, Instagram, or YouTube first.</span>
+                  <span style={{ fontSize: '0.82rem', color: '#b45309' }}>Connect Facebook or Instagram first.</span>
                 </div>
                 <Link href="/profile" className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span>Connect Accounts</span>
@@ -453,7 +453,6 @@ export default function UploadPage() {
                         {acc.platform === 'Instagram' && <InstagramIcon size={20} />}
                         {acc.platform === 'Facebook' && <FacebookIcon size={20} />}
                         {acc.platform === 'Threads' && <ThreadsIcon size={20} />}
-                        {acc.platform === 'YouTube' && <YouTubeIcon size={20} />}
                       </div>
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>{acc.clientName}</p>
@@ -678,7 +677,7 @@ export default function UploadPage() {
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
                 <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                  Title <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Required for YouTube, recommended for Facebook &amp; Threads)</span>
+                  Title <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Recommended for Facebook &amp; Threads)</span>
                 </label>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{title.length}/100</span>
               </div>
@@ -746,7 +745,7 @@ export default function UploadPage() {
             {/* Tags & Keywords Chip Input */}
             <div style={{ marginBottom: '1rem' }}>
               <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '0.3rem', display: 'block' }}>
-                Tags &amp; Keywords <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Press Enter or comma to add, used for YouTube tags &amp; SEO)</span>
+                Tags &amp; Keywords <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Press Enter or comma to add tags)</span>
               </label>
 
               <div style={{
@@ -803,10 +802,10 @@ export default function UploadPage() {
               </div>
             </div>
 
-            {/* Extended Description (Optional - YouTube / FB) */}
+            {/* Extended Description (Optional) */}
             <div>
               <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '0.3rem', display: 'block' }}>
-                Extended Description <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Optional - timestamps, links, YouTube deep description)</span>
+                Extended Description <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>(Optional - links, detailed notes)</span>
               </label>
               <textarea
                 className="textarea"
