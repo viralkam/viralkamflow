@@ -544,13 +544,6 @@ function ConnectContent() {
                 <Link2 size={17} />
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
               </a>
-              <a
-                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
-                style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
-                title="Connect via Facebook Login Dialog"
-              >
-                via Facebook Dialog
-              </a>
             </div>
           </div>
 
