@@ -533,7 +533,7 @@ function ConnectContent() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <a
-                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
+                href="/api/oauth/instagram?userId=admin"
                 className="btn btn-primary"
                 style={{
                   background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
@@ -545,11 +545,11 @@ function ConnectContent() {
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
               </a>
               <a
-                href="/api/oauth/instagram?scopeLevel=basic&userId=admin"
+                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
                 style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
-                title="Connect with basic permissions if advanced scopes are not added to Meta App yet"
+                title="Connect via Facebook Login Dialog"
               >
-                Connect Basic Profile
+                via Facebook Dialog
               </a>
             </div>
           </div>

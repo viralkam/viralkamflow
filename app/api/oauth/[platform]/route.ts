@@ -50,36 +50,28 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
-  // 2. INSTAGRAM OAUTH
+  // 2. INSTAGRAM OAUTH (Direct Instagram Login)
   if (platformKey === 'instagram') {
     const redirectUri = getInstagramOAuthRedirectUri(request);
     const mode = searchParams.get('mode');
 
-    const igCreds = getCleanInstagramCredentials();
-    const fbCreds = getCleanFacebookCredentials();
-    const isUsingFacebookApp = !igCreds.clientId || igCreds.clientId === fbCreds.clientId;
-
-    // Use Meta Dialog whenever requested OR when using Facebook App credentials (since instagram.com rejects FB App IDs)
-    if (mode === 'meta_dialog' || isUsingFacebookApp || mode !== 'direct') {
-      const { clientId, clientSecret } = fbCreds.clientId ? fbCreds : igCreds;
+    // Optional Meta Dialog fallback if explicitly requested
+    if (mode === 'meta_dialog') {
+      const { clientId, clientSecret } = getCleanFacebookCredentials();
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
           new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
         );
       }
-      const scopeLevel = searchParams.get('scopeLevel') || searchParams.get('scope');
-      const basicScopes = 'public_profile,instagram_basic,pages_show_list,pages_read_engagement';
-      const fullScopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging';
-      const scopes = scopeLevel === 'basic' ? basicScopes : fullScopes;
-
+      const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging';
       const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
       return NextResponse.redirect(authUrl);
     }
 
-    // Direct standalone Instagram OAuth (Only for dedicated Instagram App IDs)
-    const { clientId, clientSecret } = igCreds;
+    // Direct standalone Instagram OAuth -> opens instagram.com directly
+    const { clientId, clientSecret } = getCleanInstagramCredentials();
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
         new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
