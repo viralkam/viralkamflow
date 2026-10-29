@@ -23,28 +23,45 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleScheduleWorker(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: 'Supabase server configuration missing.' },
-      { status: 500 }
-    );
-  }
-
   try {
+    const supabase = createServerSupabaseClient();
     const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
 
-    // 1. Query due scheduled posts
-    const { data: duePosts, error: queryErr } = await supabase
-      .from('posts')
-      .select('id, client_name, platform, scheduled_at, status')
-      .eq('status', 'scheduled')
-      .lte('scheduled_at', nowIso)
-      .order('scheduled_at', { ascending: true })
-      .limit(10);
+    let duePosts: { id: string; client_name: string; platform: string; scheduled_at?: string; status: string }[] = [];
 
-    if (queryErr) {
-      throw queryErr;
+    // 1. Query from Supabase if configured
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('posts')
+          .select('id, client_name, platform, scheduled_at, status')
+          .eq('status', 'scheduled')
+          .lte('scheduled_at', nowIso)
+          .order('scheduled_at', { ascending: true })
+          .limit(10);
+        if (data && data.length > 0) {
+          duePosts = data;
+        }
+      } catch {}
+    }
+
+    // 2. Query from Local Admin Store
+    if (duePosts.length === 0) {
+      const { getUserData } = await import('@/lib/userStore');
+      const adminData = await getUserData('admin');
+      if (adminData && adminData.posts) {
+        duePosts = adminData.posts
+          .filter(p => p.status === 'scheduled' && p.scheduledAt && new Date(p.scheduledAt).getTime() <= nowMs)
+          .map(p => ({
+            id: p.id,
+            client_name: p.clientName,
+            platform: p.platform,
+            scheduled_at: p.scheduledAt,
+            status: p.status,
+          }))
+          .slice(0, 10);
+      }
     }
 
     if (!duePosts || duePosts.length === 0) {

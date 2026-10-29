@@ -65,7 +65,11 @@ export async function uploadDirectToInstagramReels({
   // Meta Instagram Graph API restricts native scheduled_publish_time to whitelisted Facebook Marketing Partners.
   // All standard scheduled Instagram posts are scheduled in the app database and published automatically by the background worker.
 
-  const initUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/${igUserId}/media`;
+  const isDirectIg = accessToken.startsWith('IG');
+  const igHost = isDirectIg ? 'graph.instagram.com' : 'graph.facebook.com';
+  const igTarget = isDirectIg ? 'me' : igUserId;
+
+  const initUrl = `https://${igHost}/${META_GRAPH_VERSION}/${igTarget}/media`;
   const initRes = await fetch(initUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,7 +106,7 @@ export async function uploadDirectToInstagramReels({
   for (let i = 0; i < 20; i++) {
     await new Promise((resolve) => setTimeout(resolve, 3000));
     const statusRes = await fetch(
-      `https://graph.facebook.com/${META_GRAPH_VERSION}/${containerId}?fields=status_code,status&access_token=${accessToken}`
+      `https://${igHost}/${META_GRAPH_VERSION}/${containerId}?fields=status_code,status&access_token=${accessToken}`
     );
     const statusData = await statusRes.json();
 
@@ -124,7 +128,6 @@ export async function uploadDirectToInstagramReels({
   }
 
   // Step 4: Publish Container (If not scheduled)
-  // Note: If scheduled_publish_time is set, Meta handles publishing automatically at scheduled time.
   if (scheduleTimeSeconds) {
     return {
       success: true,
@@ -134,7 +137,7 @@ export async function uploadDirectToInstagramReels({
     };
   }
 
-  const publishUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/${igUserId}/media_publish`;
+  const publishUrl = `https://${igHost}/${META_GRAPH_VERSION}/${igTarget}/media_publish`;
   const publishRes = await fetch(publishUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

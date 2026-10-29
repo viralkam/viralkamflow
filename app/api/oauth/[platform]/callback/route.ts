@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { logAudit } from '@/lib/auditLogger';
-import { getOAuthRedirectUri, getCleanMetaCredentials, getCleanInstagramCredentials, getCleanGoogleCredentials } from '@/lib/oauthUrl';
+import {
+  getOAuthRedirectUri,
+  getCleanFacebookCredentials,
+  getCleanInstagramCredentials,
+  getCleanThreadsCredentials,
+  getCleanGoogleCredentials,
+} from '@/lib/oauthUrl';
 import { addAccountToUser } from '@/lib/userStore';
 
 /**
@@ -24,7 +30,7 @@ export async function GET(
   const rawState = searchParams.get('state');
 
   let stateAccountId: string | null = null;
-  let stateUserId: string | null = request.cookies.get('pf_session_user_id')?.value || null;
+  let stateUserId: string | null = request.cookies.get('pf_session_user_id')?.value || 'admin';
 
   if (rawState) {
     try {
@@ -35,6 +41,7 @@ export async function GET(
       stateAccountId = rawState;
     }
   }
+  if (!stateUserId) stateUserId = 'admin';
 
   if (error || !code) {
     return NextResponse.redirect(
@@ -54,7 +61,7 @@ export async function GET(
 
     if (platformKey === 'instagram') {
       const { clientId: igClientId, clientSecret: igClientSecret } = getCleanInstagramCredentials();
-      const { clientId: metaClientId, clientSecret: metaClientSecret } = getCleanMetaCredentials();
+      const { clientId: metaClientId, clientSecret: metaClientSecret } = getCleanFacebookCredentials();
 
       let igExchangeSuccess = false;
 
@@ -192,7 +199,7 @@ export async function GET(
         }
       }
     } else if (platformKey === 'facebook') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
+      const { clientId, clientSecret } = getCleanFacebookCredentials();
 
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
@@ -296,7 +303,7 @@ export async function GET(
       accountId = firstChannel?.id || `yt-${Date.now()}`;
       clientName = firstChannel?.snippet?.title || 'YouTube Channel';
     } else if (platformKey === 'threads') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
+      const { clientId, clientSecret } = getCleanThreadsCredentials();
 
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
@@ -452,9 +459,10 @@ export async function GET(
         }
       }
 
-      // Save to user-isolated file
-      if (stateUserId && targetAccountId) {
-        await addAccountToUser(stateUserId, {
+      // Save to user-isolated file (Admin or specified user)
+      const targetUserId = stateUserId || 'admin';
+      if (targetAccountId) {
+        await addAccountToUser(targetUserId, {
           id: targetAccountId,
           clientName: clientName || (platformKey === 'facebook' ? 'Facebook Page' : platformKey === 'threads' ? 'Threads Account' : 'Instagram Account'),
           platform: formattedPlatform as any,

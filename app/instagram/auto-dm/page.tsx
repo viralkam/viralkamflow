@@ -74,9 +74,7 @@ export default function InstagramAutoDMPage() {
     }
   }, [showAddForm, availablePosts.length]);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+
 
   // Filter rules for Instagram only
   const igRules = autoReplyRules.filter(r => r.platform === 'Instagram' || r.platform === 'All');
@@ -171,7 +169,6 @@ export default function InstagramAutoDMPage() {
     }, 900);
   };
 
-  if (!isLoaded || !user.loggedIn) return null;
 
   return (
     <div className="app-container" style={{ maxWidth: '850px' }}>

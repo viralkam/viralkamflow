@@ -327,6 +327,16 @@ export async function findUserById(userId: string): Promise<UserRecord | null> {
     };
   }
 
+  if (userId === 'admin') {
+    return {
+      id: 'admin',
+      username: 'admin',
+      name: 'Admin',
+      membershipTier: 'Administrator',
+      createdAt: new Date().toISOString(),
+    };
+  }
+
   return null;
 }
 
@@ -334,6 +344,37 @@ export async function findUserById(userId: string): Promise<UserRecord | null> {
  * Get user data (Accounts, Posts, Rules) with Supabase persistence
  */
 export async function getUserData(userId: string): Promise<UserDataFile | null> {
+  // Fast path for Admin: instant load from memory or local disk in < 1ms
+  if (userId === 'admin') {
+    if (memoryUserData.has('admin')) {
+      return memoryUserData.get('admin')!;
+    }
+    const adminPath = getUserFilePath('admin');
+    try {
+      if (fs.existsSync(adminPath)) {
+        const raw = fs.readFileSync(adminPath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        memoryUserData.set('admin', parsed);
+        return parsed;
+      }
+    } catch {}
+
+    const defaultAdmin: UserDataFile = {
+      user: {
+        id: 'admin',
+        username: 'admin',
+        name: 'Admin',
+        membershipTier: 'Administrator',
+        createdAt: new Date().toISOString(),
+      },
+      accounts: [],
+      posts: [],
+      autoReplyRules: [],
+    };
+    memoryUserData.set('admin', defaultAdmin);
+    return defaultAdmin;
+  }
+
   const supabase = createServerSupabaseClient();
   if (supabase) {
     try {
@@ -394,6 +435,23 @@ export async function getUserData(userId: string): Promise<UserDataFile | null> 
       return parsed;
     }
   } catch {}
+
+  if (userId === 'admin') {
+    const defaultAdmin: UserDataFile = {
+      user: {
+        id: 'admin',
+        username: 'admin',
+        name: 'Admin',
+        membershipTier: 'Administrator',
+        createdAt: new Date().toISOString(),
+      },
+      accounts: [],
+      posts: [],
+      autoReplyRules: [],
+    };
+    memoryUserData.set('admin', defaultAdmin);
+    return defaultAdmin;
+  }
 
   return null;
 }

@@ -28,18 +28,39 @@ export interface PublishResult {
  */
 export async function executePublishPost(postId: string): Promise<PublishResult> {
   const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    throw new Error('Supabase server configuration is missing.');
+
+  // 1. Fetch Post (Supabase or Local store)
+  let post: any = null;
+  if (supabase) {
+    try {
+      const { data: p } = await supabase.from('posts').select('*').eq('id', postId).single();
+      if (p) post = p;
+    } catch {}
   }
 
-  // 1. Fetch Post from Supabase
-  const { data: post, error: postErr } = await supabase
-    .from('posts')
-    .select('*')
-    .eq('id', postId)
-    .single();
+  if (!post) {
+    const { getUserData } = await import('./userStore');
+    const adminData = await getUserData('admin');
+    const found = adminData?.posts?.find((p: any) => p.id === postId);
+    if (found) {
+      post = {
+        id: found.id,
+        account_id: found.accountId,
+        client_name: found.clientName,
+        platform: found.platform,
+        title: found.title,
+        caption: found.caption,
+        description: found.description,
+        media_type: found.mediaType,
+        media_url: found.mediaUrl,
+        media_name: found.mediaName,
+        scheduled_at: found.scheduledAt,
+        status: found.status,
+      };
+    }
+  }
 
-  if (postErr || !post) {
+  if (!post) {
     throw new Error(`Post with ID ${postId} not found.`);
   }
 
@@ -47,29 +68,50 @@ export async function executePublishPost(postId: string): Promise<PublishResult>
   const targetPlatform = post.platform;
 
   // 2. Fetch Associated Account
-  let account = null;
-  if (post.account_id) {
-    const { data: accById } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('id', post.account_id)
-      .maybeSingle();
-    account = accById;
+  let account: any = null;
+  if (supabase && post.account_id) {
+    try {
+      const { data: accById } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', post.account_id)
+        .maybeSingle();
+      account = accById;
+    } catch {}
+  }
+
+  if (!account && supabase) {
+    try {
+      const { data: accByName } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('client_name', post.client_name)
+        .eq('platform', post.platform)
+        .maybeSingle();
+      account = accByName;
+    } catch {}
   }
 
   if (!account) {
-    const { data: accByName } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('client_name', post.client_name)
-      .eq('platform', post.platform)
-      .maybeSingle();
-    account = accByName;
+    const { getUserData } = await import('./userStore');
+    const adminData = await getUserData('admin');
+    const acc = adminData?.accounts?.find((a: any) => a.id === post.account_id || (a.platform === post.platform && a.clientName === post.client_name));
+    if (acc) {
+      account = {
+        id: acc.id,
+        client_name: acc.clientName,
+        platform: acc.platform,
+        connection_type: acc.connectionType,
+        connection_status: acc.connectionStatus,
+        oauth_access_token: (acc as any).oauthAccessToken || (acc as any).oauth_access_token,
+        oauth_account_id: acc.oauthAccountId || (acc as any).oauth_account_id,
+      };
+    }
   }
 
   if (!account) {
     const errMsg = `No connected account found for client "${post.client_name}" on ${post.platform}.`;
-    await markPostFailed(supabase, post, errMsg);
+    if (supabase) await markPostFailed(supabase, post, errMsg);
     return { success: false, error: errMsg };
   }
 
@@ -168,11 +210,23 @@ export async function executePublishPost(postId: string): Promise<PublishResult>
     else if (account.platform === 'Instagram') {
       const igUserId = oauthAccountId || 'me';
 
-      if (!hasMedia) {
-        throw new Error('Instagram requires a public image or video URL to publish.');
-      }
+      // 1. Direct Publish of Pre-Uploaded Instagram Container (Zero storage on our server)
+      if (post.media_url && post.media_url.startsWith('instagram-container:')) {
+        const containerId = post.media_url.replace('instagram-container:', '').trim();
+        const publishEndpoint = `https://graph.facebook.com/v22.0/${igUserId}/media_publish`;
+        const publishRes = await fetch(`${publishEndpoint}?creation_id=${containerId}&access_token=${accessToken}`, {
+          method: 'POST',
+        });
+        const publishData = await publishRes.json();
 
-      if (isVideo) {
+        if (!publishRes.ok || publishData.error) {
+          handleMetaApiError(publishData.error, true);
+        }
+
+        externalPostId = publishData.id || containerId;
+      } else if (!hasMedia) {
+        throw new Error('Instagram requires a public image or video URL to publish.');
+      } else if (isVideo) {
         // Direct Resumable Upload to Instagram Reels (Zero disk / zero Supabase storage)
         const mediaRes = await fetch(post.media_url);
         if (!mediaRes.ok) {

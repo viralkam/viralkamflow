@@ -121,16 +121,57 @@ export async function processCommentForAutoReply(
   let dmSuccess = false;
   let dmError: string | undefined;
 
-  try {
-    // 6. Send Public Comment Reply
-    if (matchedRule.commentReply) {
+    // 5.5 Follower Gate Check (if enabled on rule)
+    let isFollower = true;
+    const followerGateActive = Boolean(matchedRule.requireFollower);
+
+    if (followerGateActive) {
+      isFollower = false; // Default to false until verified
+      if (fromId) {
+        try {
+          if (platform === 'Instagram') {
+            const checkRes = await fetch(
+              `https://graph.facebook.com/v22.0/${fromId}?fields=is_user_follow_business&access_token=${accessToken}`
+            );
+            const checkData = await checkRes.json();
+            if (typeof checkData.is_user_follow_business === 'boolean') {
+              isFollower = checkData.is_user_follow_business;
+            }
+          }
+        } catch (err) {
+          console.warn('[Auto Reply Engine] Follower check note:', err);
+        }
+      }
+    }
+
+    // Determine final message content based on follower gating
+    let finalDmMessage = matchedRule.dmMessage;
+    // Public reply always goes to everyone who comments (follower or unfollower)
+    const finalPublicReply = (followerGateActive && !isFollower && matchedRule.nonFollowerCommentReply)
+      ? matchedRule.nonFollowerCommentReply
+      : matchedRule.commentReply;
+
+    if (followerGateActive) {
+      if (isFollower) {
+        // Follower: Send main DM with link
+        finalDmMessage = matchedRule.followerDmMessage || matchedRule.dmMessage;
+        if (matchedRule.followerOnlyLink && !finalDmMessage.includes(matchedRule.followerOnlyLink)) {
+          finalDmMessage += `\n\n🔗 Your exclusive link: ${matchedRule.followerOnlyLink}`;
+        }
+      } else {
+        // Unfollower / Not following: Send follow-prompt DM
+        finalDmMessage = matchedRule.nonFollowerDmMessage ||
+          `Hey ${fromUser ? `@${fromUser}` : 'there'}! 👋\n\nYe link lene ke liye pehle hamare account ko follow karein! 🎁 Follow karte hi yahan reply karein ya dobara comment karein, link turant mil jayega 🚀`;
+      }
+    }
+
+    // 6. Send Public Comment Reply (Sabhi ko jayega, chahe follower ho ya unfollower)
+    if (finalPublicReply) {
       try {
         let replyEndpoint = '';
         if (platform === 'Facebook') {
-          // Facebook post comment reply: POST /{comment_id}/comments
           replyEndpoint = `https://graph.facebook.com/v22.0/${commentId}/comments`;
         } else {
-          // Instagram comment reply: POST /{comment_id}/replies
           replyEndpoint = `https://graph.facebook.com/v22.0/${commentId}/replies`;
         }
 
@@ -138,7 +179,7 @@ export async function processCommentForAutoReply(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: matchedRule.commentReply,
+            message: finalPublicReply,
             access_token: accessToken,
           }),
         });
@@ -158,7 +199,7 @@ export async function processCommentForAutoReply(
     }
 
     // 7. Send Private DM Reply
-    if (matchedRule.dmMessage) {
+    if (finalDmMessage) {
       try {
         const dmEndpoint = 'https://graph.facebook.com/v22.0/me/messages';
         const res = await fetch(dmEndpoint, {
@@ -166,7 +207,7 @@ export async function processCommentForAutoReply(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             recipient: { comment_id: commentId },
-            message: { text: matchedRule.dmMessage },
+            message: { text: finalDmMessage },
             access_token: accessToken,
           }),
         });

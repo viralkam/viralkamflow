@@ -23,10 +23,6 @@ export default function DashboardPage() {
     totalLikes: number; totalComments: number; totalViews: number;
   }>({ igCount: 0, fbCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0 });
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
-
   // Fetch live stats from API
   useEffect(() => {
     async function fetchStats() {
@@ -49,10 +45,8 @@ export default function DashboardPage() {
         }
       } catch {}
     }
-    if (isLoaded && user.loggedIn) fetchStats();
-  }, [isLoaded, user.loggedIn]);
-
-  if (!isLoaded || !user.loggedIn) return null;
+    if (isLoaded) fetchStats();
+  }, [isLoaded]);
 
   const connectedAccounts = accounts.filter(a => a.connectionStatus === 'Connected' && a.connectionType === 'oauth');
   const igAccounts = connectedAccounts.filter(a => a.platform === 'Instagram');

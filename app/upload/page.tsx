@@ -71,9 +71,7 @@ export default function UploadPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; success: boolean; error?: string }>>([]);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+
 
   // Default schedule: tomorrow 10 AM
   useEffect(() => {
@@ -215,48 +213,10 @@ export default function UploadPage() {
     setCaption(prev => prev ? `${prev} ${ht}` : ht);
   };
 
-  // Prepare media payload: if file > 4 MB, upload to temporary transit bucket directly from browser via signed upload authorization
-  // This bypasses Vercel's 4.5 MB proxy limit AND Supabase RLS restrictions, and backend purges the transit file immediately (0 MB permanent storage)
-  const prepareMediaPayload = async (): Promise<{ mediaUrl?: string; tempStoragePath?: string; fileToSend?: File }> => {
+  // Stream media directly: video buffer is streamed directly to Meta / Instagram / YouTube servers
+  // ZERO server disk storage and ZERO Supabase storage used!
+  const prepareMediaPayload = async (): Promise<{ mediaUrl?: string; fileToSend?: File }> => {
     if (mediaFile) {
-      if (mediaFile.size > 4 * 1024 * 1024) {
-        if (!supabase) {
-          throw new Error('Supabase client is not available for direct transit upload.');
-        }
-
-        // 1. Authorize transit upload via server-side service-role client (bypasses RLS)
-        const signRes = await fetch('/api/upload/transit-sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: mediaFile.name }),
-        });
-        const signData = await signRes.json();
-        if (!signRes.ok || !signData.token || !signData.path) {
-          throw new Error(signData.error || 'Failed to authorize secure transit upload');
-        }
-
-        // 2. Direct browser upload to signed URL (zero RLS violations)
-        const { error: upErr } = await supabase.storage
-          .from('media')
-          .uploadToSignedUrl(signData.path, signData.token, mediaFile, {
-            contentType: mediaFile.type,
-            upsert: true,
-          });
-
-        if (upErr) {
-          // Direct PUT fallback to signedUrl
-          const putRes = await fetch(signData.signedUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': mediaFile.type },
-            body: mediaFile,
-          });
-          if (!putRes.ok) {
-            throw new Error(`Direct transit upload error: ${upErr.message}`);
-          }
-        }
-
-        return { mediaUrl: signData.publicUrl, tempStoragePath: signData.path };
-      }
       return { fileToSend: mediaFile };
     }
     
@@ -283,16 +243,13 @@ export default function UploadPage() {
 
     setIsSubmitting(true);
     try {
-      const { mediaUrl, tempStoragePath, fileToSend } = await prepareMediaPayload();
+      const { mediaUrl, fileToSend } = await prepareMediaPayload();
 
       const fd = new FormData();
       if (fileToSend) {
         fd.append('file', fileToSend);
       } else if (mediaUrl) {
         fd.append('mediaUrl', mediaUrl);
-        if (tempStoragePath) {
-          fd.append('tempStoragePath', tempStoragePath);
-        }
       }
 
       fd.append('title', title.trim());
@@ -359,16 +316,13 @@ export default function UploadPage() {
 
     setIsSubmitting(true);
     try {
-      const { mediaUrl, tempStoragePath, fileToSend } = await prepareMediaPayload();
+      const { mediaUrl, fileToSend } = await prepareMediaPayload();
 
       const fd = new FormData();
       if (fileToSend) {
         fd.append('file', fileToSend);
       } else if (mediaUrl) {
         fd.append('mediaUrl', mediaUrl);
-        if (tempStoragePath) {
-          fd.append('tempStoragePath', tempStoragePath);
-        }
       }
 
       fd.append('title', title.trim());
@@ -416,8 +370,6 @@ export default function UploadPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (!isLoaded || !user.loggedIn) return null;
 
   return (
     <div className="app-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem' }}>

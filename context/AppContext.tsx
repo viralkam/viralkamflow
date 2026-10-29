@@ -54,49 +54,68 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+export const DEFAULT_ADMIN_USER: UserProfile = {
+  id: 'admin',
+  username: 'admin',
+  name: 'Admin',
+  membershipTier: 'Administrator',
+  loggedIn: true,
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile>({ name: '', loggedIn: false });
+  const [user, setUser] = useState<UserProfile>(DEFAULT_ADMIN_USER);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [autoReplyRules, setAutoReplyRules] = useState<AutoReplyRule[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(true);
   const [isUsingSupabase, setIsUsingSupabase] = useState(false);
+
+  // Instant hydration from local client storage on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('pf_cached_data_admin');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.accounts) setAccounts(parsed.accounts);
+        if (parsed.posts) setPosts(parsed.posts);
+        if (parsed.autoReplyRules) setAutoReplyRules(parsed.autoReplyRules);
+      }
+    } catch {}
+  }, []);
 
   const refreshData = useCallback(async () => {
     try {
-      // 1. Check session user from server
+      // 1. Fetch user data immediately
+      const dataRes = await fetch('/api/user/data');
+      if (dataRes.ok) {
+        const json = await dataRes.json();
+        if (json.data) {
+          const accs = json.data.accounts || [];
+          const pts = json.data.posts || [];
+          const rules = json.data.autoReplyRules || [];
+          setAccounts(accs);
+          setPosts(pts);
+          setAutoReplyRules(rules);
+          try {
+            localStorage.setItem('pf_cached_data_admin', JSON.stringify({ accounts: accs, posts: pts, autoReplyRules: rules }));
+          } catch {}
+        }
+      }
+
+      // 2. Refresh auth profile
       const meRes = await fetch('/api/auth/me');
       if (meRes.ok) {
         const meData = await meRes.json();
         if (meData.loggedIn && meData.user) {
           setUser({
-            id: meData.user.id,
-            username: meData.user.username,
-            name: meData.user.name,
-            membershipTier: meData.user.membershipTier || 'Free Member',
+            id: meData.user.id || 'admin',
+            username: meData.user.username || 'admin',
+            name: meData.user.name || 'Admin',
+            membershipTier: meData.user.membershipTier || 'Administrator',
             loggedIn: true,
           });
-
-          // 2. Fetch data strictly from this user's isolated file
-          const dataRes = await fetch('/api/user/data');
-          if (dataRes.ok) {
-            const json = await dataRes.json();
-            if (json.data) {
-              setAccounts(json.data.accounts || []);
-              setPosts(json.data.posts || []);
-              setAutoReplyRules(json.data.autoReplyRules || []);
-            }
-          }
-          setIsLoaded(true);
-          return;
         }
       }
-
-      // If not logged in, reset all accounts to empty!
-      setUser({ name: '', loggedIn: false });
-      setAccounts([]);
-      setPosts([]);
-      setAutoReplyRules([]);
     } catch (err) {
       console.warn('[AppContext] Failed to refresh data:', err);
     } finally {
@@ -106,27 +125,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback((userData: { id?: string; username?: string; name: string; membershipTier?: string }) => {
     setUser({
-      id: userData.id,
-      username: userData.username,
-      name: userData.name,
-      membershipTier: userData.membershipTier || 'Free Member',
+      id: userData.id || 'admin',
+      username: userData.username || 'admin',
+      name: userData.name || 'Admin',
+      membershipTier: userData.membershipTier || 'Administrator',
       loggedIn: true,
     });
     refreshData();
   }, [refreshData]);
 
   const logout = useCallback(async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {}
-    setUser({ name: '', loggedIn: false });
-    setAccounts([]);
-    setPosts([]);
-    setAutoReplyRules([]);
-    try {
-      localStorage.clear();
-    } catch {}
-  }, []);
+    // Admin mode: refresh data instead of locking out
+    await refreshData();
+  }, [refreshData]);
 
   // Initial load
   useEffect(() => {

@@ -1,24 +1,37 @@
 import { NextResponse } from 'next/server';
-import { getCleanMetaCredentials, getCleanGoogleCredentials } from '@/lib/oauthUrl';
+import {
+  getCleanFacebookCredentials,
+  getCleanInstagramCredentials,
+  getCleanThreadsCredentials,
+  getCleanGoogleCredentials,
+} from '@/lib/oauthUrl';
 
 /**
  * Server-side OAuth configuration check.
- * Strictly returns only boolean flags and safe status messages.
+ * Strictly returns boolean status flags per independent platform.
  * NEVER returns raw secrets or API keys to the browser.
  */
 export async function GET() {
-  const metaCreds = getCleanMetaCredentials();
-  const googleCreds = getCleanGoogleCredentials();
-  const hasMeta = Boolean(metaCreds.clientId && metaCreds.clientSecret);
-  const hasGoogle = Boolean(googleCreds.clientId && googleCreds.clientSecret);
+  const fb = getCleanFacebookCredentials();
+  const ig = getCleanInstagramCredentials();
+  const th = getCleanThreadsCredentials();
+  const yt = getCleanGoogleCredentials();
+
+  const hasFacebook = Boolean(fb.clientId && fb.clientSecret);
+  const hasInstagram = Boolean(ig.clientId && ig.clientSecret);
+  const hasThreads = Boolean(th.clientId && th.clientSecret);
+  const hasYouTube = Boolean(yt.clientId && yt.clientSecret);
 
   return NextResponse.json({
     configured: {
-      instagram: hasMeta,
-      facebook: hasMeta,
-      youtube: hasGoogle,
+      facebook: hasFacebook,
+      instagram: hasInstagram,
+      threads: hasThreads,
+      youtube: hasYouTube,
     },
-    metaConfigured: hasMeta,
-    googleConfigured: hasGoogle,
+    facebookConfigured: hasFacebook,
+    instagramConfigured: hasInstagram,
+    threadsConfigured: hasThreads,
+    googleConfigured: hasYouTube,
   });
 }

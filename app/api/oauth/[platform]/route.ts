@@ -3,11 +3,14 @@ import {
   getFacebookOAuthRedirectUri,
   getInstagramOAuthRedirectUri,
   getYouTubeOAuthRedirectUri,
-  getOAuthRedirectUri,
-  getCleanMetaCredentials,
+  getThreadsOAuthRedirectUri,
+  getCleanFacebookCredentials,
   getCleanInstagramCredentials,
+  getCleanThreadsCredentials,
   getCleanGoogleCredentials,
-  buildFacebookOAuthUrl,
+  getFacebookScopes,
+  getInstagramScopes,
+  getThreadsScopes,
 } from '@/lib/oauthUrl';
 
 /**
@@ -26,12 +29,13 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams;
   const accountId = searchParams.get('accountId');
-  const userId = searchParams.get('userId') || request.cookies.get('pf_session_user_id')?.value;
-  const stateData = JSON.stringify({ accountId: accountId || null, userId: userId || null });
+  const userId = searchParams.get('userId') || request.cookies.get('pf_session_user_id')?.value || 'admin';
+  const stateData = JSON.stringify({ accountId: accountId || null, userId });
   const stateQuery = `&state=${encodeURIComponent(Buffer.from(stateData).toString('base64'))}`;
 
+  // 1. FACEBOOK OAUTH
   if (platformKey === 'facebook' || platformKey === 'meta') {
-    const { clientId, clientSecret } = getCleanMetaCredentials();
+    const { clientId, clientSecret } = getCleanFacebookCredentials();
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
@@ -40,8 +44,7 @@ export async function GET(
     }
 
     const redirectUri = getFacebookOAuthRedirectUri(request);
-    // Facebook Page connection, publishing, comments, and messaging scopes
-    const scopes = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,pages_read_user_content';
+    const scopes = getFacebookScopes();
     const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
@@ -49,18 +52,18 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
+  // 2. INSTAGRAM OAUTH
   if (platformKey === 'instagram') {
     const redirectUri = getInstagramOAuthRedirectUri(request);
     const mode = searchParams.get('mode'); // 'instagram_login' (default) or 'meta_dialog'
 
     if (mode === 'meta_dialog') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
+      const { clientId, clientSecret } = getCleanFacebookCredentials();
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
           new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
         );
       }
-      // Instagram Graph API via Meta Facebook Dialog
       const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
       const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
@@ -68,15 +71,15 @@ export async function GET(
       return NextResponse.redirect(authUrl);
     }
 
-    // Direct Instagram OAuth (Instagram Login for Professionals / Business) uses Instagram App ID
+    // Direct Instagram OAuth (Instagram Login for Professionals / Business)
     const { clientId, clientSecret } = getCleanInstagramCredentials();
-    if (!clientId) {
+    if (!clientId || !clientSecret) {
       return NextResponse.redirect(
         new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
       );
     }
 
-    const scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+    const scopes = getInstagramScopes();
     const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
@@ -84,8 +87,9 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
+  // 3. THREADS OAUTH
   if (platformKey === 'threads') {
-    const { clientId, clientSecret } = getCleanMetaCredentials();
+    const { clientId, clientSecret } = getCleanThreadsCredentials();
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
@@ -93,8 +97,8 @@ export async function GET(
       );
     }
 
-    const redirectUri = getOAuthRedirectUri('threads', request);
-    const scopes = 'threads_basic,threads_content_publish';
+    const redirectUri = getThreadsOAuthRedirectUri(request);
+    const scopes = getThreadsScopes();
 
     const authUrl = `https://threads.net/oauth/authorize?client_id=${clientId}&app_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
@@ -103,6 +107,7 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
+  // 4. YOUTUBE OAUTH
   if (platformKey === 'youtube') {
     const { clientId, clientSecret } = getCleanGoogleCredentials();
 
@@ -117,10 +122,10 @@ export async function GET(
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+    )}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent${stateQuery}`;
 
     return NextResponse.redirect(authUrl);
   }
 
-  return NextResponse.redirect(new URL('/connect', request.url));
+  return NextResponse.redirect(new URL('/connect?error=unsupported_platform', request.url));
 }

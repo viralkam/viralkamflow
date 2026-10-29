@@ -8,7 +8,8 @@ import { useApp } from '@/context/AppContext';
 import { InstagramIcon, FacebookIcon, ThreadsIcon, MetaIcon } from '@/components/PlatformIcons';
 import {
   MessageSquareText, Plus, CheckCircle2, AlertTriangle, Trash2,
-  Zap, Copy, Check, Send, Sparkles, ArrowRight, ShieldCheck, ChevronDown, ChevronUp, RefreshCw
+  Zap, Copy, Check, Send, Sparkles, ArrowRight, ShieldCheck, ChevronDown, ChevronUp, RefreshCw,
+  Lock, Unlock, UserCheck, UserX, Link2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,6 +30,13 @@ export default function AutoReplyPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
+  // Follower-Only Link Gate State
+  const [requireFollower, setRequireFollower] = useState(false);
+  const [followerOnlyLink, setFollowerOnlyLink] = useState('');
+  const [followerDmMessage, setFollowerDmMessage] = useState('');
+  const [nonFollowerDmMessage, setNonFollowerDmMessage] = useState('');
+  const [nonFollowerCommentReply, setNonFollowerCommentReply] = useState('');
+
   // Simulation State
   const [simulatingRuleId, setSimulatingRuleId] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<{
@@ -37,6 +45,8 @@ export default function AutoReplyPage() {
     keyword: string;
     sentDm: string;
     publicReply?: string;
+    isFollower?: boolean;
+    wasFollowerGated?: boolean;
   } | null>(null);
 
   // Live Auto-Reply Scanner State
@@ -54,9 +64,7 @@ export default function AutoReplyPage() {
     : 'https://your-domain.com/api/webhooks/meta';
   const verifyToken = 'publishingflow_meta_token';
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+
 
   // Sync initial server rules
   useEffect(() => {
@@ -111,7 +119,6 @@ export default function AutoReplyPage() {
     }
   };
 
-  if (!isLoaded || !user.loggedIn) return null;
 
   const totalTriggers = autoReplyRules.reduce((acc, r) => acc + (r.triggerCount || 0), 0);
   const activeRulesCount = autoReplyRules.filter(r => r.isActive).length;
@@ -137,6 +144,11 @@ export default function AutoReplyPage() {
         dmMessage: dmMessage.trim(),
         commentReply: commentReply.trim() || undefined,
         isActive,
+        requireFollower,
+        followerOnlyLink: followerOnlyLink.trim() || undefined,
+        followerDmMessage: followerDmMessage.trim() || undefined,
+        nonFollowerDmMessage: nonFollowerDmMessage.trim() || undefined,
+        nonFollowerCommentReply: nonFollowerCommentReply.trim() || undefined,
       });
 
       // Persist to server API as well
@@ -150,6 +162,11 @@ export default function AutoReplyPage() {
       setKeyword('');
       setDmMessage('');
       setCommentReply('');
+      setRequireFollower(false);
+      setFollowerOnlyLink('');
+      setFollowerDmMessage('');
+      setNonFollowerDmMessage('');
+      setNonFollowerCommentReply('');
       setShowAddForm(false);
       setTimeout(() => setFormSuccess(null), 4000);
     } catch (err: any) {
@@ -157,19 +174,37 @@ export default function AutoReplyPage() {
     }
   };
 
-  const handleSimulateTest = async (rule: typeof autoReplyRules[0]) => {
+  const handleSimulateTest = async (rule: typeof autoReplyRules[0], asFollower: boolean = true) => {
     setSimulatingRuleId(rule.id);
     setSimulationResult(null);
 
-    // Simulate 1.2 second processing
+    // Simulate 0.9 second processing
     setTimeout(async () => {
       await incrementRuleTriggerCount(rule.id);
+
+      let sentDm = rule.dmMessage;
+      let publicReply = rule.commentReply;
+
+      if (rule.requireFollower) {
+        if (asFollower) {
+          sentDm = rule.followerDmMessage || rule.dmMessage;
+          if (rule.followerOnlyLink && !sentDm.includes(rule.followerOnlyLink)) {
+            sentDm += `\n\n🔗 Your exclusive link: ${rule.followerOnlyLink}`;
+          }
+        } else {
+          sentDm = rule.nonFollowerDmMessage || "Hey! 👋 To unlock your exclusive link, please follow our account first! Once you follow, comment again or reply here. 🎁";
+          publicReply = rule.nonFollowerCommentReply || "Please follow our profile first so we can DM you the link! 🔒";
+        }
+      }
+
       setSimulationResult({
         ruleId: rule.id,
-        commenter: '@rahul_creator',
+        commenter: asFollower ? '@rahul_follower (Follower ✅)' : '@amit_guest (Non-Follower 🔒)',
         keyword: rule.keyword,
-        sentDm: rule.dmMessage,
-        publicReply: rule.commentReply,
+        sentDm,
+        publicReply,
+        isFollower: asFollower,
+        wasFollowerGated: Boolean(rule.requireFollower),
       });
       setSimulatingRuleId(null);
     }, 900);
@@ -214,14 +249,25 @@ export default function AutoReplyPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="btn btn-primary"
-          style={{ padding: '0.75rem 1.25rem' }}
-        >
-          <Plus size={18} />
-          <span>{showAddForm ? 'Close Form' : 'New Automation Rule'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Link
+            href="/comments"
+            className="btn btn-secondary"
+            style={{ padding: '0.75rem 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+          >
+            <MessageSquareText size={17} color="#4f46e5" />
+            <span>Live Comments Inbox</span>
+          </Link>
+
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="btn btn-primary"
+            style={{ padding: '0.75rem 1.25rem' }}
+          >
+            <Plus size={18} />
+            <span>{showAddForm ? 'Close Form' : 'New Automation Rule'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Quick Metrics Bar */}
@@ -356,25 +402,26 @@ export default function AutoReplyPage() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                 <label className="form-label" style={{ margin: 0 }}>
-                  Trigger Keyword / Phrase
+                  Trigger Keyword (Koi bhi comment kare ya specific word)
                 </label>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  {['LINK', 'PRICE', 'INFO', '*'].map((preset) => (
+                  {['*', 'LINK', 'PRICE', 'INFO'].map((preset) => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setKeyword(preset)}
                       style={{
                         fontSize: '0.72rem',
-                        padding: '0.15rem 0.5rem',
+                        padding: '0.2rem 0.55rem',
                         borderRadius: '4px',
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
-                        color: 'var(--text-main)',
+                        background: keyword === preset ? '#e0e7ff' : '#f1f5f9',
+                        border: keyword === preset ? '1px solid #6366f1' : '1px solid #cbd5e1',
+                        color: keyword === preset ? '#4338ca' : 'var(--text-main)',
+                        fontWeight: keyword === preset ? 700 : 500,
                         cursor: 'pointer'
                       }}
                     >
-                      +{preset === '*' ? 'Any comment (*)' : preset}
+                      {preset === '*' ? '⚡ Any Comment (*)' : `+ ${preset}`}
                     </button>
                   ))}
                 </div>
@@ -382,35 +429,20 @@ export default function AutoReplyPage() {
               <input
                 type="text"
                 className="input"
-                placeholder="e.g. LINK, PRICE, DEMO, or * for all comments"
+                placeholder="e.g. * (for all comments) ya LINK, PRICE, DEMO"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value.toUpperCase())}
                 required
               />
               <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem', display: 'block' }}>
-                Tip: Case-insensitive. Entering <code>*</code> triggers for any comment on your post.
+                💡 <strong>* (Asterisk)</strong> select karne par koi bhi user kuch bhi comment kare (Follower ya Unfollower), yeh auto-reply turant chalega!
               </span>
             </div>
 
-            {/* Automated DM */}
+            {/* Public Comment Reply (Always sent to everyone) */}
             <div>
               <label className="form-label">
-                Automated DM Message (Sent directly to commenter's inbox)
-              </label>
-              <textarea
-                className="textarea"
-                rows={4}
-                placeholder="Hey there! 👋 Here is your exclusive link: https://yourwebsite.com/offer&#10;&#10;Let me know if you have any questions!"
-                value={dmMessage}
-                onChange={(e) => setDmMessage(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Public Reply */}
-            <div>
-              <label className="form-label">
-                Public Comment Reply (Optional - visible under their comment)
+                Public Comment Reply (Sabhi ko public reply milega)
               </label>
               <input
                 type="text"
@@ -419,6 +451,132 @@ export default function AutoReplyPage() {
                 value={commentReply}
                 onChange={(e) => setCommentReply(e.target.value)}
               />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem', display: 'block' }}>
+                Yeh reply user ke comment ke niche publically publish hoga (Follower aur Unfollower dono ko jayega).
+              </span>
+            </div>
+
+            {/* Automated DM */}
+            <div>
+              <label className="form-label">
+                Main DM Message (Follower / Default DM)
+              </label>
+              <textarea
+                className="textarea"
+                rows={3}
+                placeholder="Hey there! 👋 Here is your exclusive link: https://yourwebsite.com/offer&#10;&#10;Let me know if you have any questions!"
+                value={dmMessage}
+                onChange={(e) => setDmMessage(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* FOLLOWER-ONLY LINK GATE TOGGLE */}
+            <div style={{
+              padding: '1.25rem',
+              borderRadius: 'var(--radius-md)',
+              background: requireFollower ? '#f5f3ff' : '#f8fafc',
+              border: requireFollower ? '2px solid #8b5cf6' : '1px solid var(--border)',
+              transition: 'all 0.2s ease'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={requireFollower}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setRequireFollower(val);
+                    if (val && !nonFollowerDmMessage) {
+                      setNonFollowerDmMessage("Hey! 👋 Ye link lene ke liye pehle hamare account ko follow karein! Follow karte hi yahan reply karein ya wapas comment karein, link turant mil jayega 🚀");
+                    }
+                  }}
+                  style={{ width: '18px', height: '18px', marginTop: '0.15rem', accentColor: '#7c3aed', cursor: 'pointer' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {requireFollower ? <Lock size={15} color="#7c3aed" /> : <Unlock size={15} color="#64748b" />}
+                      Follower-Only Link Gate (Instagram Trending Flow 🔥)
+                    </span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '999px',
+                      background: requireFollower ? '#ede9fe' : '#e2e8f0',
+                      color: requireFollower ? '#6d28d9' : '#475569'
+                    }}>
+                      Viral Follower Growth 🚀
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45 }}>
+                    {requireFollower ? (
+                      <span style={{ color: '#6d28d9', fontWeight: 600 }}>
+                        Active: Commenter agar <strong>Follower</strong> hai toh link wala main DM jayega. Agar <strong>Follower NAHI</strong> hai toh pehle account follow karne ka prompt DM jayega!
+                      </span>
+                    ) : (
+                      <span>
+                        Unchecked (Default): Comment aate hi har kisi ko direct main DM chala jayega (chahe follow kiya ho ya na kiya ho).
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </label>
+
+              {requireFollower && (
+                <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed #c4b5fd', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Link URL */}
+                  <div>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Link2 size={14} color="#7c3aed" />
+                      <span>Target Link / URL (Jo Followers ko Dena Hai)</span>
+                    </label>
+                    <input
+                      type="url"
+                      className="input"
+                      placeholder="https://yourwebsite.com/exclusive-offer"
+                      value={followerOnlyLink}
+                      onChange={(e) => setFollowerOnlyLink(e.target.value)}
+                    />
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '0.25rem', display: 'block' }}>
+                      Yeh link verified follower ke DM message me automatically attach ho jayega.
+                    </span>
+                  </div>
+
+                  {/* Follower DM */}
+                  <div>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <UserCheck size={14} color="#059669" />
+                      <span>Follower DM Message (Verified Followers ke liye)</span>
+                    </label>
+                    <textarea
+                      className="textarea"
+                      rows={3}
+                      placeholder="Thanks for following! 🎉 Here is your exclusive link: https://yourwebsite.com/offer&#10;&#10;Enjoy!"
+                      value={followerDmMessage}
+                      onChange={(e) => setFollowerDmMessage(e.target.value)}
+                    />
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '0.25rem', display: 'block' }}>
+                      Agar blank chhodenge toh upar wala standard DM message send hoga.
+                    </span>
+                  </div>
+
+                  {/* Non-Follower DM */}
+                  <div>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <UserX size={14} color="#d97706" />
+                      <span>Non-Follower DM Message (Follow karne ka prompt)</span>
+                    </label>
+                    <textarea
+                      className="textarea"
+                      rows={3}
+                      placeholder="Hey! 👋 Ye link lene ke liye pehle hamare account ko follow karein! Follow karte hi reply karein ya wapas comment karein, link turant mil jayega 🚀"
+                      value={nonFollowerDmMessage}
+                      onChange={(e) => setNonFollowerDmMessage(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Buttons */}
@@ -632,6 +790,24 @@ export default function AutoReplyPage() {
                         Keyword: "{rule.keyword}"
                       </span>
 
+                      {/* Follower Gate Badge */}
+                      {rule.requireFollower && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '6px',
+                          background: '#ede9fe',
+                          color: '#6d28d9',
+                          fontWeight: 700,
+                          fontSize: '0.78rem'
+                        }}>
+                          <Lock size={12} />
+                          <span>Follower Gate Active</span>
+                        </span>
+                      )}
+
                       {/* Trigger Count */}
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontWeight: 600 }}>
                         🚀 {rule.triggerCount || 0} DMs sent
@@ -639,7 +815,7 @@ export default function AutoReplyPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       {/* Active Toggle Switch */}
                       <button
                         onClick={() => toggleAutoReplyRule(rule.id)}
@@ -661,17 +837,42 @@ export default function AutoReplyPage() {
                         <span>{rule.isActive ? 'Active' : 'Paused'}</span>
                       </button>
 
-                      {/* Test Simulator Button */}
-                      <button
-                        onClick={() => handleSimulateTest(rule)}
-                        disabled={isSimulating}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                        title="Simulate a follower commenting to test this automation"
-                      >
-                        <Sparkles size={13} color="#4f46e5" />
-                        <span>{isSimulating ? 'Sending...' : 'Test DM'}</span>
-                      </button>
+                      {/* Test Simulator Buttons */}
+                      {rule.requireFollower ? (
+                        <>
+                          <button
+                            onClick={() => handleSimulateTest(rule, true)}
+                            disabled={isSimulating}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', color: '#047857', background: '#ecfdf5', borderColor: '#a7f3d0' }}
+                            title="Simulate comment from an account who FOLLOWS you (receives link)"
+                          >
+                            <UserCheck size={13} color="#059669" />
+                            <span>{isSimulating ? '...' : 'Test Follower ✅'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleSimulateTest(rule, false)}
+                            disabled={isSimulating}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', color: '#b45309', background: '#fef3c7', borderColor: '#fde68a' }}
+                            title="Simulate comment from a NON-FOLLOWER (receives follow prompt)"
+                          >
+                            <UserX size={13} color="#d97706" />
+                            <span>{isSimulating ? '...' : 'Test Non-Follower 🔒'}</span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleSimulateTest(rule, true)}
+                          disabled={isSimulating}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                          title="Simulate a user commenting to test this automation"
+                        >
+                          <Sparkles size={13} color="#4f46e5" />
+                          <span>{isSimulating ? 'Sending...' : 'Test DM'}</span>
+                        </button>
+                      )}
 
                       {/* Delete */}
                       <button
@@ -689,41 +890,78 @@ export default function AutoReplyPage() {
                     </div>
                   </div>
 
-                  {/* Content Preview (DM Bubble) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: rule.commentReply ? '1.4fr 1fr' : '1fr', gap: '1rem' }}>
-                    {/* Private DM bubble */}
-                    <div style={{
-                      background: '#f8fafc',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '0.85rem 1rem',
-                      border: '1px solid var(--border)'
-                    }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Send size={12} color="#4f46e5" />
-                        <span>Private Direct Message (DM):</span>
-                      </div>
-                      <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
-                        {rule.dmMessage}
-                      </p>
-                    </div>
-
-                    {/* Optional Public comment reply */}
+                  {/* Content Preview */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {/* Public Comment Reply (Sabhi commenters ko milega) */}
                     {rule.commentReply && (
                       <div style={{
                         background: '#f8fafc',
                         borderRadius: 'var(--radius-md)',
-                        padding: '0.85rem 1rem',
-                        border: '1px solid var(--border)'
+                        padding: '0.75rem 1rem',
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap'
                       }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <MessageSquareText size={12} color="#db2777" />
-                          <span>Public Comment Reply:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#db2777', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <MessageSquareText size={13} color="#db2777" />
+                            <span>Public Comment Reply (Sabhi ko):</span>
+                          </span>
+                          <span style={{ fontSize: '0.86rem', color: 'var(--text-main)', fontStyle: 'italic' }}>
+                            "{rule.commentReply}"
+                          </span>
                         </div>
-                        <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.45 }}>
-                          "{rule.commentReply}"
-                        </p>
+                        <span style={{ fontSize: '0.7rem', color: '#10b981', background: '#ecfdf5', padding: '0.15rem 0.5rem', borderRadius: '999px', fontWeight: 600 }}>
+                          Follower + Unfollower dono ko ✅
+                        </span>
                       </div>
                     )}
+
+                    {/* DMs Section: Dual cards if follower gate active, or single DM card */}
+                    <div style={{ display: 'grid', gridTemplateColumns: rule.requireFollower ? '1fr 1fr' : '1fr', gap: '0.85rem' }}>
+                      {/* Follower / Standard DM bubble */}
+                      <div style={{
+                        background: '#f8fafc',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '0.85rem 1rem',
+                        border: rule.requireFollower ? '1px solid #c7d2fe' : '1px solid var(--border)'
+                      }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: rule.requireFollower ? '#4338ca' : 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {rule.requireFollower ? <UserCheck size={13} color="#4f46e5" /> : <Send size={12} color="#4f46e5" />}
+                          <span>{rule.requireFollower ? 'Follower DM (Link ke saath):' : 'Private Direct Message (DM):'}</span>
+                        </div>
+                        <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', lineHeight: 1.45, margin: 0 }}>
+                          {rule.followerDmMessage || rule.dmMessage}
+                        </p>
+                        {rule.followerOnlyLink && (
+                          <div style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.5rem', background: '#eff6ff', borderRadius: '4px', fontSize: '0.78rem', color: '#1d4ed8', fontWeight: 600 }}>
+                            <Link2 size={12} />
+                            <span>{rule.followerOnlyLink}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Non-Follower DM (if Follower Gate Active) */}
+                      {rule.requireFollower && (
+                        <div style={{
+                          background: '#fffbeb',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '0.85rem 1rem',
+                          border: '1px solid #fde68a'
+                        }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <UserX size={13} color="#d97706" />
+                            <span>Non-Follower DM (Follow Prompt):</span>
+                          </div>
+                          <p style={{ fontSize: '0.88rem', color: '#78350f', whiteSpace: 'pre-wrap', lineHeight: 1.45, margin: 0 }}>
+                            {rule.nonFollowerDmMessage || "Hey! 👋 Ye link lene ke liye pehle hamare account ko follow karein! Follow karte hi reply karein ya wapas comment karein, link turant mil jayega 🚀"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* LIVE SIMULATION RESULT BANNER */}
@@ -732,22 +970,27 @@ export default function AutoReplyPage() {
                       marginTop: '1rem',
                       padding: '0.85rem 1.15rem',
                       borderRadius: 'var(--radius-md)',
-                      background: '#eff6ff',
-                      border: '1px solid #bfdbfe',
+                      background: simulationResult.isFollower ? '#eff6ff' : '#fffbeb',
+                      border: simulationResult.isFollower ? '1px solid #bfdbfe' : '1px solid #fde68a',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '0.4rem'
+                      gap: '0.45rem'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <CheckCircle2 size={16} color="#2563eb" />
-                          Test Success: Automated DM triggered!
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: simulationResult.isFollower ? '#1d4ed8' : '#b45309', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {simulationResult.isFollower ? <CheckCircle2 size={16} color="#2563eb" /> : <Lock size={16} color="#d97706" />}
+                          {simulationResult.isFollower
+                            ? 'Test Success: Follower verified & Link delivered!'
+                            : 'Test Success: Non-follower detected & Follow Prompt sent!'}
                         </span>
-                        <span style={{ fontSize: '0.72rem', color: '#60a5fa' }}>Trigger count +1</span>
+                        <span style={{ fontSize: '0.72rem', color: simulationResult.isFollower ? '#60a5fa' : '#d97706' }}>Trigger count +1</span>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#1e40af' }}>
-                        Follower <strong>{simulationResult.commenter}</strong> commented: <em>"{simulationResult.keyword}"</em>.
-                        Automated DM delivered directly to their inbox!
+                      <div style={{ fontSize: '0.8rem', color: simulationResult.isFollower ? '#1e40af' : '#78350f' }}>
+                        User <strong>{simulationResult.commenter}</strong> commented: <em>"{simulationResult.keyword}"</em>.
+                      </div>
+                      <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.06)', fontSize: '0.82rem', color: 'var(--text-main)' }}>
+                        <strong>Simulated DM Delivered:</strong>
+                        <div style={{ marginTop: '0.2rem', whiteSpace: 'pre-wrap' }}>{simulationResult.sentDm}</div>
                       </div>
                     </div>
                   )}

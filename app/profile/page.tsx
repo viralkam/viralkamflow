@@ -24,32 +24,6 @@ function ProfileContent() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
-
-  useEffect(() => {
-    const connected = searchParams.get('connected');
-    const platform = searchParams.get('platform');
-    const name = searchParams.get('name');
-    if (connected === 'true') {
-      if (name && !user.loggedIn) {
-        login({ name });
-      }
-      setSuccessMsg(`Meta account connected successfully${name ? `: ${name}` : ''}!`);
-      refreshData();
-      setTimeout(() => setSuccessMsg(null), 5000);
-    }
-
-    const error = searchParams.get('error');
-    if (error) {
-      setErrorMsg(`Connection error: ${error}. Please try again.`);
-      setTimeout(() => setErrorMsg(null), 6000);
-    }
-  }, [searchParams, refreshData]);
-
-  if (!isLoaded || !user.loggedIn) return null;
-
   const metaAccounts = accounts.filter(a =>
     (a.platform === 'Facebook' || a.platform === 'Instagram' || a.platform === 'Threads') &&
     a.connectionType === 'oauth' && a.connectionStatus === 'Connected'

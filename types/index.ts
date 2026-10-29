@@ -17,6 +17,11 @@ export interface AutoReplyRule {
   createdAt: string;
   targetPostId?: string; // Specific post/reel ID or 'all'
   targetPostTitle?: string;
+  requireFollower?: boolean; // Follower-only Gate: link only sent if commenter follows
+  followerOnlyLink?: string; // Direct link or resource to send
+  followerDmMessage?: string; // DM sent to verified followers (with link)
+  nonFollowerDmMessage?: string; // DM sent to non-followers prompting them to follow
+  nonFollowerCommentReply?: string; // Public reply telling user to follow
 }
 
 export interface Client {

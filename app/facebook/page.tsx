@@ -38,10 +38,6 @@ export default function FacebookPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
-
   const fetchFeed = async () => {
     setLoading(true);
     try {
@@ -55,10 +51,8 @@ export default function FacebookPage() {
   };
 
   useEffect(() => {
-    if (isLoaded && user.loggedIn) fetchFeed();
-  }, [isLoaded, user.loggedIn]);
-
-  if (!isLoaded || !user.loggedIn) return null;
+    if (isLoaded) fetchFeed();
+  }, [isLoaded]);
 
   const filtered = filter === 'all' ? items : items.filter(i => i.mediaType === filter);
   const totalLikes = items.reduce((s, i) => s + i.likeCount, 0);

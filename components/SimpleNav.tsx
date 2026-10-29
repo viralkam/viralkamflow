@@ -6,7 +6,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { Share2, Link2, Upload, ListChecks, LogOut, MessageSquareText, LayoutGrid } from 'lucide-react';
+import { Share2, Link2, Upload, ListChecks, LogOut, MessageSquareText, LayoutGrid, MessageSquare } from 'lucide-react';
 
 export function SimpleNav() {
   const pathname = usePathname();
@@ -24,8 +24,9 @@ export function SimpleNav() {
     { href: '/profile', label: '1. Accounts', icon: <Link2 size={16} /> },
     { href: '/upload', label: '2. Upload & Publish', icon: <Upload size={16} /> },
     { href: '/content', label: '3. Content Manager', icon: <LayoutGrid size={16} /> },
-    { href: '/auto-reply', label: '4. Auto Reply', icon: <MessageSquareText size={16} /> },
-    { href: '/dashboard', label: '5. Overview', icon: <ListChecks size={16} /> },
+    { href: '/comments', label: '4. Comments Inbox', icon: <MessageSquare size={16} /> },
+    { href: '/auto-reply', label: '5. Auto Reply', icon: <MessageSquareText size={16} /> },
+    { href: '/dashboard', label: '6. Overview', icon: <ListChecks size={16} /> },
   ];
 
   return (

@@ -9,6 +9,7 @@ import {
   Link2,
   Image as ImageIconLucide,
   Megaphone,
+  MessageSquare,
   MessageSquareText,
   Bot,
   LogOut,
@@ -63,18 +64,18 @@ const menuItems = [
     accent: '#1877F2',
   },
   {
-    href: '/instagram/auto-dm',
-    label: 'Instagram Auto DM',
-    icon: MessageSquareText,
-    description: 'Auto reply & DMs',
-    accent: '#E1306C',
+    href: '/comments',
+    label: 'Comments Inbox',
+    icon: MessageSquare,
+    description: 'Sabka real comments feed',
+    accent: '#8b5cf6',
   },
   {
-    href: '/facebook/auto-dm',
-    label: 'Facebook Auto DM',
+    href: '/auto-reply',
+    label: 'Auto-Reply Rules',
     icon: Bot,
-    description: 'Auto reply & DMs',
-    accent: '#1877F2',
+    description: 'Comment-to-DM & gates',
+    accent: '#4f46e5',
   },
 ];
 
@@ -86,9 +87,8 @@ export function Sidebar() {
 
   if (!user.loggedIn) return null;
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
+  const handleRefresh = async () => {
+    await logout(); // re-runs refreshData()
   };
 
   const isActive = (href: string) => {
@@ -178,11 +178,11 @@ export function Sidebar() {
               </span>
             </div>
             <button
-              onClick={handleLogout}
+              onClick={handleRefresh}
               className="sidebar-logout-btn"
-              title="Log Out"
+              title="Refresh / Sync Data"
             >
-              <LogOut size={16} />
+              <LayoutDashboard size={16} />
             </button>
           </div>
         </div>

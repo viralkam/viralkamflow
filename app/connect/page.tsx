@@ -20,7 +20,10 @@ import {
   Shield,
   Wifi,
   ExternalLink,
-  Info,
+  Settings,
+  Save,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function ConnectPage() {
@@ -40,13 +43,82 @@ export default function ConnectPage() {
 function ConnectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, login, isLoaded, accounts, deleteAccount, refreshData } = useApp();
+  const { user, isLoaded, accounts, deleteAccount, refreshData } = useApp();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // App Credentials Settings State
+  const [showConfig, setShowConfig] = useState(false);
+  const [credentials, setCredentials] = useState<{
+    facebook: { appId: string; hasSecret: boolean };
+    instagram: { appId: string; hasSecret: boolean };
+    threads: { appId: string; hasSecret: boolean };
+    youtube: { appId: string; hasSecret: boolean };
+  }>({
+    facebook: { appId: '', hasSecret: false },
+    instagram: { appId: '', hasSecret: false },
+    threads: { appId: '', hasSecret: false },
+    youtube: { appId: '', hasSecret: false },
+  });
+
+  // Form inputs for updating keys
+  const [fbAppId, setFbAppId] = useState('');
+  const [fbAppSecret, setFbAppSecret] = useState('');
+  const [igAppId, setIgAppId] = useState('');
+  const [igAppSecret, setIgAppSecret] = useState('');
+  const [thAppId, setThAppId] = useState('');
+  const [thAppSecret, setThAppSecret] = useState('');
+  const [savingKeys, setSavingKeys] = useState(false);
+  const [keysSavedMsg, setKeysSavedMsg] = useState<string | null>(null);
+
+  const fetchCredentials = async () => {
+    try {
+      const res = await fetch('/api/admin/credentials');
+      if (res.ok) {
+        const data = await res.json();
+        setCredentials(data);
+        if (data.facebook?.appId) setFbAppId(data.facebook.appId);
+        if (data.instagram?.appId) setIgAppId(data.instagram.appId);
+        if (data.threads?.appId) setThAppId(data.threads.appId);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+    fetchCredentials();
+  }, []);
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingKeys(true);
+    setKeysSavedMsg(null);
+    try {
+      const res = await fetch('/api/admin/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facebookAppId: fbAppId,
+          facebookAppSecret: fbAppSecret || undefined,
+          instagramAppId: igAppId,
+          instagramAppSecret: igAppSecret || undefined,
+          threadsAppId: thAppId,
+          threadsAppSecret: thAppSecret || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setKeysSavedMsg('New App credentials saved successfully!');
+        fetchCredentials();
+        setTimeout(() => setKeysSavedMsg(null), 4000);
+      } else {
+        setErrorMsg(data.error || 'Failed to save credentials');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error saving credentials');
+    } finally {
+      setSavingKeys(false);
+    }
+  };
 
   useEffect(() => {
     const connected = searchParams.get('connected');
@@ -54,7 +126,6 @@ function ConnectContent() {
     const name = searchParams.get('name');
 
     if (connected === 'true') {
-      if (name && !user.loggedIn) login({ name });
       const platformDisplay = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Channel';
       setSuccessMsg(`${platformDisplay} connected successfully${name ? `: ${name}` : ''}!`);
       refreshData();
@@ -63,12 +134,16 @@ function ConnectContent() {
 
     const error = searchParams.get('error');
     if (error) {
-      setErrorMsg(`Connection error: ${error}. Please try again.`);
+      if (error === 'oauth_not_configured') {
+        const p = searchParams.get('platform') || 'platform';
+        setErrorMsg(`New ${p} App ID/Secret is not configured yet. Click "Configure App Credentials" below to add it.`);
+        setShowConfig(true);
+      } else {
+        setErrorMsg(`Connection notice: ${error}. Please try again.`);
+      }
       setTimeout(() => setErrorMsg(null), 7000);
     }
-  }, [searchParams, refreshData, login, user.loggedIn]);
-
-  if (!isLoaded || !user.loggedIn) return null;
+  }, [searchParams, refreshData]);
 
   const connectedAccounts = accounts.filter(
     (a) => a.connectionType === 'oauth' && a.connectionStatus === 'Connected'
@@ -86,14 +161,11 @@ function ConnectContent() {
     }
   };
 
-  const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
-  const metaAppId = '1656696732464075';
-
   return (
-    <div className="app-container" style={{ maxWidth: '920px' }}>
+    <div className="app-container" style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem' }}>
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div
             style={{
               width: '42px',
@@ -109,12 +181,23 @@ function ConnectContent() {
             <Link2 size={22} />
           </div>
           <div>
-            <h1 className="page-title" style={{ fontSize: '1.65rem' }}>Connect Channels</h1>
-            <p className="page-desc">
-              Connect Instagram, Facebook, Threads & YouTube individually via isolated OAuth
+            <h1 className="page-title" style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0 }}>
+              Connect Social Channels
+            </h1>
+            <p className="page-desc" style={{ color: 'var(--text-dim)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
+              Connect Facebook, Instagram, Threads &amp; YouTube individually with dedicated apps
             </p>
           </div>
         </div>
+
+        <button
+          onClick={() => setShowConfig(!showConfig)}
+          className="btn btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}
+        >
+          <Settings size={16} />
+          <span>{showConfig ? 'Hide App Settings' : 'Configure App Credentials'}</span>
+        </button>
       </div>
 
       {/* Notifications */}
@@ -157,6 +240,159 @@ function ConnectContent() {
         >
           <AlertTriangle size={18} color="#e11d48" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* App Credentials Configuration Panel */}
+      {showConfig && (
+        <div
+          className="card"
+          style={{
+            background: '#fff',
+            border: '2px solid #6366f1',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 4px 14px rgba(99, 102, 241, 0.1)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                Set Your New App Credentials
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Enter your new Facebook App ID, Instagram App ID, and Threads App ID. They are saved securely into <code>.env.local</code>.
+              </p>
+            </div>
+            {keysSavedMsg && (
+              <span style={{ fontSize: '0.82rem', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Check size={16} /> {keysSavedMsg}
+              </span>
+            )}
+          </div>
+
+          <form onSubmit={handleSaveCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              
+              {/* Facebook App */}
+              <div style={{ border: '1px solid #bfdbfe', borderRadius: '10px', padding: '1rem', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <FacebookIcon size={18} />
+                  <strong style={{ fontSize: '0.92rem', color: '#1877f2' }}>Facebook App Credentials</strong>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Facebook App ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. 123456789012345"
+                      value={fbAppId}
+                      onChange={(e) => setFbAppId(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Facebook App Secret</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder={credentials.facebook?.hasSecret ? '•••••••••••••••• (Configured)' : 'Enter App Secret'}
+                      value={fbAppSecret}
+                      onChange={(e) => setFbAppSecret(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Instagram App */}
+              <div style={{ border: '1px solid #fbcfe8', borderRadius: '10px', padding: '1rem', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <InstagramIcon size={18} />
+                  <strong style={{ fontSize: '0.92rem', color: '#e1306c' }}>Instagram App Credentials</strong>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Instagram App ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. 987654321098765"
+                      value={igAppId}
+                      onChange={(e) => setIgAppId(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Instagram App Secret</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder={credentials.instagram?.hasSecret ? '•••••••••••••••• (Configured)' : 'Enter App Secret'}
+                      value={igAppSecret}
+                      onChange={(e) => setIgAppSecret(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Threads App */}
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <ThreadsIcon size={18} />
+                  <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>Threads App Credentials</strong>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Threads App ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. 543216789012345"
+                      value={thAppId}
+                      onChange={(e) => setThAppId(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Threads App Secret</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder={credentials.threads?.hasSecret ? '•••••••••••••••• (Configured)' : 'Enter App Secret'}
+                      value={thAppSecret}
+                      onChange={(e) => setThAppSecret(e.target.value)}
+                      style={{ fontSize: '0.85rem', width: '100%', marginTop: '0.2rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfig(false)}
+                className="btn btn-ghost"
+                style={{ fontSize: '0.88rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingKeys}
+                className="btn btn-primary"
+                style={{ background: '#6366f1', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}
+              >
+                <Save size={16} />
+                <span>{savingKeys ? 'Saving...' : 'Save New Credentials'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -294,14 +530,14 @@ function ConnectContent() {
                   </span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Connect your Instagram Professional or Creator account for Reels, media posts & auto-replies
+                  Connect your Instagram Professional or Creator account for Reels direct posting &amp; Auto DM
                 </p>
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <a
-                href={`/api/oauth/instagram${userIdParam}`}
+                href="/api/oauth/instagram?userId=admin"
                 className="btn btn-primary"
                 style={{
                   background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
@@ -313,9 +549,9 @@ function ConnectContent() {
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
               </a>
               <a
-                href={`/api/oauth/instagram?mode=meta_dialog${user?.id ? `&userId=${encodeURIComponent(user.id)}` : ''}`}
+                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
                 style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
-                title="Connect using Facebook Dialog with Instagram scopes if needed"
+                title="Connect via Facebook Login Dialog with Instagram scopes"
               >
                 via Meta Dialog
               </a>
@@ -419,13 +655,13 @@ function ConnectContent() {
                   </span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Connect your Facebook Pages to publish feed posts, video reels & moderate comments
+                  Connect your Facebook Pages to publish feed posts, video reels &amp; auto-replies
                 </p>
               </div>
             </div>
 
             <a
-              href={`/api/oauth/facebook${userIdParam}`}
+              href="/api/oauth/facebook?userId=admin"
               className="btn btn-primary"
               style={{ background: '#1877f2', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
             >
@@ -531,13 +767,13 @@ function ConnectContent() {
                   </span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Connect your Threads profile directly to post text discussions, media and threads
+                  Connect your Threads account directly to post text discussions, media and threads
                 </p>
               </div>
             </div>
 
             <a
-              href={`/api/oauth/threads${userIdParam}`}
+              href="/api/oauth/threads?userId=admin"
               className="btn btn-primary"
               style={{ background: '#0f172a', color: '#ffffff', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
             >
@@ -643,13 +879,13 @@ function ConnectContent() {
                   </span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Connect your YouTube channel to schedule video uploads & YouTube Shorts
+                  Connect your YouTube channel to schedule video uploads &amp; YouTube Shorts
                 </p>
               </div>
             </div>
 
             <a
-              href={`/api/oauth/youtube${userIdParam}`}
+              href="/api/oauth/youtube?userId=admin"
               className="btn btn-primary"
               style={{ background: '#dc2626', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
             >
@@ -722,7 +958,7 @@ function ConnectContent() {
 
       </div>
 
-      {/* Meta App Architecture Note */}
+      {/* Guide Note */}
       <div
         style={{
           padding: '1.25rem 1.5rem',
@@ -752,15 +988,12 @@ function ConnectContent() {
         </div>
         <div>
           <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-            Single Meta Developer App Architecture
+            Independent Platform Connections
           </h4>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-            Instagram, Facebook, and Threads are all powered by your single Meta App (App ID:{' '}
-            <code style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px', fontSize: '0.82rem' }}>
-              {metaAppId}
-            </code>
-            ). You do <strong>not</strong> need multiple Meta apps! Each platform initiates its own isolated OAuth
-            dialog (Instagram OAuth, Facebook OAuth, Threads OAuth) using the same verified Meta credentials.
+            Facebook, Instagram, and Threads can now each connect via their own dedicated app credentials.
+            When you create your new apps on Meta Developer Portal, simply click <strong>Configure App Credentials</strong> above
+            to paste your new App ID and App Secret. Each channel initiates its own isolated OAuth flow!
           </p>
         </div>
       </div>

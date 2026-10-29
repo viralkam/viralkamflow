@@ -24,6 +24,11 @@ export async function POST(req: NextRequest) {
       createdAt: body.createdAt || new Date().toISOString(),
       targetPostId: body.targetPostId || undefined,
       targetPostTitle: body.targetPostTitle || undefined,
+      requireFollower: Boolean(body.requireFollower),
+      followerOnlyLink: body.followerOnlyLink?.trim() || undefined,
+      followerDmMessage: body.followerDmMessage?.trim() || undefined,
+      nonFollowerDmMessage: body.nonFollowerDmMessage?.trim() || undefined,
+      nonFollowerCommentReply: body.nonFollowerCommentReply?.trim() || undefined,
     };
 
     await addServerRule(newRule);

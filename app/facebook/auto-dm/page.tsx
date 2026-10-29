@@ -74,9 +74,7 @@ export default function FacebookAutoDMPage() {
     }
   }, [showAddForm, availablePosts.length]);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+
 
   // Filter rules for Facebook only
   const fbRules = autoReplyRules.filter(r => r.platform === 'Facebook' || r.platform === 'All');
@@ -171,7 +169,6 @@ export default function FacebookAutoDMPage() {
     }, 900);
   };
 
-  if (!isLoaded || !user.loggedIn) return null;
 
   return (
     <div className="app-container" style={{ maxWidth: '850px' }}>

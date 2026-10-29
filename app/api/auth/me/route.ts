@@ -3,22 +3,38 @@ import { findUserById } from '@/lib/userStore';
 
 export async function GET(req: NextRequest) {
   const sessionUserId = req.cookies.get('pf_session_user_id')?.value;
-  if (!sessionUserId) {
-    return NextResponse.json({ loggedIn: false, user: null }, { status: 401 });
-  }
+  let user = sessionUserId ? await findUserById(sessionUserId) : null;
 
-  const user = await findUserById(sessionUserId);
+  // Admin Direct Mode: Default to Admin user so no login is ever required
   if (!user) {
-    return NextResponse.json({ loggedIn: false, user: null }, { status: 401 });
+    user = {
+      id: 'admin',
+      username: 'admin',
+      name: 'Admin',
+      membershipTier: 'Administrator',
+      createdAt: new Date().toISOString(),
+    };
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     loggedIn: true,
     user: {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      membershipTier: user.membershipTier || 'Free Member',
+      id: user.id || 'admin',
+      username: user.username || 'admin',
+      name: user.name || 'Admin',
+      membershipTier: user.membershipTier || 'Administrator',
     },
   });
+
+  // Ensure pf_session_user_id cookie is present for background requests
+  if (!sessionUserId) {
+    response.cookies.set('pf_session_user_id', 'admin', {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return response;
 }

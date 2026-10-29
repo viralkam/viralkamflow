@@ -1,4 +1,6 @@
 import type { NextRequest } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * The canonical production base URL for PublishingFlow.
@@ -7,41 +9,31 @@ import type { NextRequest } from 'next/server';
 export const CANONICAL_APP_BASE_URL = 'https://publishingflow-rc85.vercel.app';
 
 /**
- * Deprecated old Consumer App ID.
- */
-export const DEPRECATED_META_APP_ID = '1077484934693230';
-
-/**
- * Verified Facebook / Meta Business App ID for PublishingFlow.
- */
-export const VERIFIED_META_APP_ID = '1656696732464075';
-export const VERIFIED_META_APP_SECRET = 'b483be922e7f2a603902364c434ae594';
-
-/**
  * Returns the sanitized base URL of the application.
- * Dynamically uses the current request origin so rc85, custom domains, and localhost work seamlessly.
+ * Dynamically uses current request origin (supporting localhost & custom domains).
  */
 export function getAppBaseUrl(request?: NextRequest): string {
   if (request) {
-    const origin = request.nextUrl.origin.replace(/\/+$/, '');
+    const origin = request.nextUrl.origin?.replace(/\/+$/, '');
     if (origin && !origin.includes('undefined')) {
       return origin;
+    }
+    const host = request.headers.get('host');
+    if (host) {
+      const proto = request.headers.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+      return `${proto}://${host}`.replace(/\/+$/, '');
     }
   }
 
   let envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/^["']|["']$/g, '');
-
   if (envUrl) {
     envUrl = envUrl.replace(/\/api\/oauth.*$/i, '').replace(/\/+$/, '');
-
     try {
       const parsed = new URL(envUrl.startsWith('http') ? envUrl : `https://${envUrl}`);
       return parsed.origin;
     } catch {
       const match = envUrl.match(/^(https?:\/\/[^\/\s]+)/i);
-      if (match) {
-        return match[1].replace(/\/+$/, '');
-      }
+      if (match) return match[1].replace(/\/+$/, '');
     }
   }
 
@@ -49,7 +41,7 @@ export function getAppBaseUrl(request?: NextRequest): string {
 }
 
 /**
- * Distinct, isolated callback URL for Facebook OAuth.
+ * Isolated callback URL for Facebook OAuth.
  */
 export function getFacebookOAuthRedirectUri(request?: NextRequest): string {
   const base = getAppBaseUrl(request);
@@ -57,23 +49,23 @@ export function getFacebookOAuthRedirectUri(request?: NextRequest): string {
 }
 
 /**
- * Distinct, isolated callback URL for Instagram OAuth.
- * Instagram strictly enforces HTTPS and only allows whitelisted production callback URIs.
+ * Isolated callback URL for Instagram OAuth.
  */
 export function getInstagramOAuthRedirectUri(request?: NextRequest): string {
-  return `${CANONICAL_APP_BASE_URL}/api/oauth/instagram/callback`;
+  const base = getAppBaseUrl(request);
+  return `${base}/api/oauth/instagram/callback`;
 }
 
 /**
- * Distinct, isolated callback URL for Threads OAuth.
- * Threads strictly enforces HTTPS and only allows whitelisted production callback URIs.
+ * Isolated callback URL for Threads OAuth.
  */
 export function getThreadsOAuthRedirectUri(request?: NextRequest): string {
-  return `${CANONICAL_APP_BASE_URL}/api/oauth/threads/callback`;
+  const base = getAppBaseUrl(request);
+  return `${base}/api/oauth/threads/callback`;
 }
 
 /**
- * Distinct, isolated callback URL for YouTube OAuth.
+ * Isolated callback URL for YouTube OAuth.
  */
 export function getYouTubeOAuthRedirectUri(request?: NextRequest): string {
   const base = getAppBaseUrl(request);
@@ -95,115 +87,141 @@ export function getOAuthRedirectUri(platform: string, request?: NextRequest): st
 }
 
 /**
- * Resolves clean Meta credentials (App ID and Secret).
+ * Reads local .env.local file directly as fallback for immediate hot reload.
  */
-export function getCleanMetaCredentials(): { clientId: string; clientSecret?: string } {
-  const rawId = (
-    process.env.META_CLIENT_ID ||
-    process.env.META_APP_ID ||
-    process.env.FACEBOOK_APP_ID ||
-    VERIFIED_META_APP_ID
-  )?.trim().replace(/^["']|["']$/g, '');
-
-  const rawSecret = (
-    process.env.META_CLIENT_SECRET ||
-    process.env.META_APP_SECRET ||
-    process.env.FACEBOOK_APP_SECRET ||
-    VERIFIED_META_APP_SECRET
-  )?.trim().replace(/^["']|["']$/g, '');
-
-  let cleanId = rawId ? rawId.replace(/^your-/i, '') : '';
-  if (!cleanId || cleanId === DEPRECATED_META_APP_ID) {
-    cleanId = VERIFIED_META_APP_ID;
+function readEnvKey(key: string): string | undefined {
+  if (process.env[key]) {
+    const val = process.env[key]?.trim().replace(/^["']|["']$/g, '');
+    if (val) return val;
   }
-
-  let clientSecret = rawSecret ? rawSecret.replace(/^your-/i, '') : undefined;
-  if (!clientSecret || rawId === DEPRECATED_META_APP_ID || clientSecret === 'e8b47d511762d7c70c4ac7f1c7241b93') {
-    clientSecret = VERIFIED_META_APP_SECRET;
-  }
-
-  return { clientId: cleanId, clientSecret };
+  try {
+    const envPath = path.join(process.cwd(), '.env.local');
+    if (fs.existsSync(envPath)) {
+      const text = fs.readFileSync(envPath, 'utf8');
+      const regex = new RegExp(`^${key}\\s*=\\s*([^\\r\\n]+)`, 'm');
+      const match = text.match(regex);
+      if (match && match[1]) {
+        return match[1].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {}
+  return undefined;
 }
 
 /**
- * Verified Instagram App ID and Secret from Meta Instagram Business Login.
+ * Resolves dedicated Facebook App Credentials.
+ * Configured via FACEBOOK_APP_ID & FACEBOOK_APP_SECRET (or META_CLIENT_ID / META_CLIENT_SECRET).
+ * NO OLD HARDCODED FALLBACK!
  */
-export const VERIFIED_INSTAGRAM_APP_ID = '1373462491434641';
-export const VERIFIED_INSTAGRAM_APP_SECRET = '7e964b60d0af60e492b06eb51c6256b6';
+export function getCleanFacebookCredentials(): { clientId: string; clientSecret?: string } {
+  const rawId = (
+    readEnvKey('FACEBOOK_APP_ID') ||
+    readEnvKey('FACEBOOK_CLIENT_ID') ||
+    readEnvKey('META_CLIENT_ID') ||
+    readEnvKey('META_APP_ID') ||
+    ''
+  ).trim();
+
+  const rawSecret = (
+    readEnvKey('FACEBOOK_APP_SECRET') ||
+    readEnvKey('FACEBOOK_CLIENT_SECRET') ||
+    readEnvKey('META_CLIENT_SECRET') ||
+    readEnvKey('META_APP_SECRET') ||
+    ''
+  ).trim();
+
+  return { clientId: rawId, clientSecret: rawSecret || undefined };
+}
 
 /**
- * Resolves Instagram specific App credentials (Instagram App ID & Secret).
+ * Backward compatibility alias for Facebook/Meta credentials.
+ */
+export function getCleanMetaCredentials(): { clientId: string; clientSecret?: string } {
+  return getCleanFacebookCredentials();
+}
+
+/**
+ * Resolves dedicated Instagram App Credentials.
+ * Configured via INSTAGRAM_APP_ID & INSTAGRAM_APP_SECRET (or INSTAGRAM_CLIENT_ID / INSTAGRAM_CLIENT_SECRET).
+ * NO OLD HARDCODED FALLBACK!
  */
 export function getCleanInstagramCredentials(): { clientId: string; clientSecret?: string } {
   const rawId = (
-    process.env.INSTAGRAM_CLIENT_ID ||
-    process.env.INSTAGRAM_APP_ID ||
-    VERIFIED_INSTAGRAM_APP_ID
-  )?.trim().replace(/^["']|["']$/g, '');
+    readEnvKey('INSTAGRAM_APP_ID') ||
+    readEnvKey('INSTAGRAM_CLIENT_ID') ||
+    readEnvKey('FACEBOOK_APP_ID') ||
+    readEnvKey('META_CLIENT_ID') ||
+    ''
+  ).trim();
 
   const rawSecret = (
-    process.env.INSTAGRAM_CLIENT_SECRET ||
-    process.env.INSTAGRAM_APP_SECRET ||
-    VERIFIED_INSTAGRAM_APP_SECRET
-  )?.trim().replace(/^["']|["']$/g, '');
+    readEnvKey('INSTAGRAM_APP_SECRET') ||
+    readEnvKey('INSTAGRAM_CLIENT_SECRET') ||
+    readEnvKey('FACEBOOK_APP_SECRET') ||
+    readEnvKey('META_CLIENT_SECRET') ||
+    ''
+  ).trim();
 
-  return { clientId: rawId || VERIFIED_INSTAGRAM_APP_ID, clientSecret: rawSecret || VERIFIED_INSTAGRAM_APP_SECRET };
+  return { clientId: rawId, clientSecret: rawSecret || undefined };
 }
 
 /**
- * Verified permissions for Facebook Page connection, content publishing, and Auto-Reply.
+ * Resolves dedicated Threads App Credentials.
+ * Configured via THREADS_APP_ID & THREADS_APP_SECRET (or THREADS_CLIENT_ID / THREADS_CLIENT_SECRET).
+ * NO OLD HARDCODED FALLBACK!
  */
-export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_manage_posts';
+export function getCleanThreadsCredentials(): { clientId: string; clientSecret?: string } {
+  const rawId = (
+    readEnvKey('THREADS_APP_ID') ||
+    readEnvKey('THREADS_CLIENT_ID') ||
+    readEnvKey('FACEBOOK_APP_ID') ||
+    readEnvKey('META_CLIENT_ID') ||
+    ''
+  ).trim();
 
-/**
- * Returns clean Facebook OAuth scopes, allowing override via META_FACEBOOK_SCOPES.
- */
-export function getFacebookScopes(): string {
-  const envScopes = process.env.META_FACEBOOK_SCOPES?.trim().replace(/^["']|["']$/g, '');
-  return envScopes || DEFAULT_FACEBOOK_SCOPES;
+  const rawSecret = (
+    readEnvKey('THREADS_APP_SECRET') ||
+    readEnvKey('THREADS_CLIENT_SECRET') ||
+    readEnvKey('FACEBOOK_APP_SECRET') ||
+    readEnvKey('META_CLIENT_SECRET') ||
+    ''
+  ).trim();
+
+  return { clientId: rawId, clientSecret: rawSecret || undefined };
 }
 
 /**
- * Builds the official Meta Facebook OAuth authorization dialog URL.
- */
-export function buildFacebookOAuthUrl(clientId: string, redirectUri: string): string {
-  const configId = (process.env.META_CONFIG_ID || process.env.FACEBOOK_CONFIG_ID)?.trim().replace(/^["']|["']$/g, '');
-
-  if (configId) {
-    return `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&config_id=${encodeURIComponent(configId)}&response_type=code`;
-  }
-
-  const scopes = getFacebookScopes();
-  return `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-    redirectUri
-  )}&scope=${encodeURIComponent(scopes)}&response_type=code`;
-}
-
-/**
- * Resolves clean Google credentials with immediate disk fallback for local development.
+ * Resolves clean Google credentials.
  */
 export function getCleanGoogleCredentials(): { clientId?: string; clientSecret?: string } {
-  let clientId = (process.env.GOOGLE_CLIENT_ID || '')?.trim().replace(/^["']|["']$/g, '');
-  let clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '')?.trim().replace(/^["']|["']$/g, '');
-
-  if (!clientId || !clientSecret || clientId.includes('your-google')) {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const envPath = path.join(process.cwd(), '.env.local');
-      if (fs.existsSync(envPath)) {
-        const text = fs.readFileSync(envPath, 'utf8');
-        const idMatch = text.match(/GOOGLE_CLIENT_ID\s*=\s*([^\r\n]+)/);
-        const secMatch = text.match(/GOOGLE_CLIENT_SECRET\s*=\s*([^\r\n]+)/);
-        if (idMatch && idMatch[1]) clientId = idMatch[1].trim().replace(/^["']|["']$/g, '');
-        if (secMatch && secMatch[1]) clientSecret = secMatch[1].trim().replace(/^["']|["']$/g, '');
-      }
-    } catch {
-      // safe catch
-    }
-  }
-
+  const clientId = readEnvKey('GOOGLE_CLIENT_ID');
+  const clientSecret = readEnvKey('GOOGLE_CLIENT_SECRET');
   return { clientId, clientSecret };
+}
+
+/**
+ * Standard Facebook OAuth Scopes for Page connection, posting & Auto-Reply.
+ */
+export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,pages_messaging';
+
+export function getFacebookScopes(): string {
+  return readEnvKey('FACEBOOK_SCOPES') || readEnvKey('META_FACEBOOK_SCOPES') || DEFAULT_FACEBOOK_SCOPES;
+}
+
+/**
+ * Standard Instagram OAuth Scopes.
+ */
+export const DEFAULT_INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+
+export function getInstagramScopes(): string {
+  return readEnvKey('INSTAGRAM_SCOPES') || DEFAULT_INSTAGRAM_SCOPES;
+}
+
+/**
+ * Standard Threads OAuth Scopes.
+ */
+export const DEFAULT_THREADS_SCOPES = 'threads_basic,threads_content_publish';
+
+export function getThreadsScopes(): string {
+  return readEnvKey('THREADS_SCOPES') || DEFAULT_THREADS_SCOPES;
 }

@@ -94,9 +94,7 @@ export default function ContentManagerPage() {
   // Selected item for modal preview
   const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
 
-  useEffect(() => {
-    if (isLoaded && !user.loggedIn) router.replace('/');
-  }, [isLoaded, user.loggedIn, router]);
+
 
   // Fetch live feed from Meta Graph API
   const syncLiveFeed = async () => {
@@ -156,8 +154,6 @@ export default function ContentManagerPage() {
   const totalLikes = allContent.reduce((sum, c) => sum + (c.likeCount || 0), 0);
   const totalComments = allContent.reduce((sum, c) => sum + (c.commentCount || 0), 0);
   const totalViews = allContent.reduce((sum, c) => sum + (c.viewCount || 0), 0);
-
-  if (!isLoaded || !user.loggedIn) return null;
 
   return (
     <div className="app-container" style={{ maxWidth: '1050px' }}>

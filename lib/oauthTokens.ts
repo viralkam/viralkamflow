@@ -1,6 +1,11 @@
 import { createServerSupabaseClient } from './supabaseServer';
 import { logAudit } from './auditLogger';
-import { getCleanMetaCredentials, getCleanGoogleCredentials } from './oauthUrl';
+import {
+  getCleanFacebookCredentials,
+  getCleanInstagramCredentials,
+  getCleanThreadsCredentials,
+  getCleanGoogleCredentials,
+} from './oauthUrl';
 
 /**
  * Server-Side OAuth Token Manager with Automatic Refresh
@@ -95,10 +100,10 @@ export async function getValidAccessToken(accountId: string): Promise<{
       refreshedToken = refreshData.access_token;
       newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
     } else if (account.platform === 'Facebook') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
+      const { clientId, clientSecret } = getCleanFacebookCredentials();
 
       if (!clientId || !clientSecret) {
-        throw new Error('Missing Meta OAuth client credentials.');
+        throw new Error('Missing Facebook OAuth client credentials.');
       }
 
       console.log(`[OAuth Auto-Refresh]: Refreshing Facebook token for account ${account.client_name}...`);
@@ -112,11 +117,8 @@ export async function getValidAccessToken(accountId: string): Promise<{
         newExpiresAt = new Date(Date.now() + (metaData.expires_in || 5184000) * 1000).toISOString();
       }
     } else if (account.platform === 'Instagram') {
-      const { clientId, clientSecret } = getCleanMetaCredentials();
-
-      if (!clientId || !clientSecret) {
-        throw new Error('Missing Meta OAuth client credentials.');
-      }
+      const { clientId, clientSecret } = getCleanInstagramCredentials();
+      const fbCreds = getCleanFacebookCredentials();
 
       console.log(`[OAuth Auto-Refresh]: Refreshing Instagram token for account ${account.client_name}...`);
       let refreshed = false;
@@ -135,10 +137,10 @@ export async function getValidAccessToken(accountId: string): Promise<{
       } catch {}
 
       // 2. Fallback to Meta exchange endpoint (for Page-linked Instagram tokens)
-      if (!refreshed) {
+      if (!refreshed && fbCreds.clientId && fbCreds.clientSecret) {
         try {
           const metaRes = await fetch(
-            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${account.oauth_access_token}`
+            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${fbCreds.clientId}&client_secret=${fbCreds.clientSecret}&fb_exchange_token=${account.oauth_access_token}`
           );
           const metaData = await metaRes.json();
           if (metaRes.ok && metaData.access_token) {
@@ -148,10 +150,10 @@ export async function getValidAccessToken(accountId: string): Promise<{
         } catch {}
       }
     } else if (account.platform === 'Threads') {
-      const { clientSecret } = getCleanMetaCredentials();
+      const { clientSecret } = getCleanThreadsCredentials();
 
       if (!clientSecret) {
-        throw new Error('Missing Meta OAuth client secret for Threads.');
+        throw new Error('Missing Threads OAuth client secret.');
       }
 
       console.log(`[OAuth Auto-Refresh]: Refreshing Threads token for account ${account.client_name}...`);
