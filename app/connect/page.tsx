@@ -545,11 +545,11 @@ function ConnectContent() {
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
               </a>
               <a
-                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
+                href="/api/oauth/instagram?scopeLevel=basic&userId=admin"
                 style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
-                title="Connect via Facebook Login Dialog with Instagram scopes"
+                title="Connect with basic permissions if advanced scopes are not added to Meta App yet"
               >
-                via Meta Dialog
+                Connect Basic Profile
               </a>
             </div>
           </div>

@@ -67,7 +67,11 @@ export async function GET(
           new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
         );
       }
-      const scopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+      const scopeLevel = searchParams.get('scopeLevel') || searchParams.get('scope');
+      const basicScopes = 'public_profile,instagram_basic,pages_show_list,pages_read_engagement';
+      const fullScopes = 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,business_management,instagram_manage_comments,instagram_manage_messages,pages_messaging,pages_read_user_content';
+      const scopes = scopeLevel === 'basic' ? basicScopes : fullScopes;
+
       const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
