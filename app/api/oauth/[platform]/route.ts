@@ -61,8 +61,9 @@ export async function GET(
       );
     }
 
-    const scopes = getInstagramScopes();
-    const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    const scopeParam = searchParams.get('scope');
+    const scopes = scopeParam || getInstagramScopes();
+    const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
 

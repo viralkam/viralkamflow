@@ -544,6 +544,13 @@ function ConnectContent() {
                 <Link2 size={17} />
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
               </a>
+              <a
+                href="/api/oauth/instagram?scope=user_profile,user_media&userId=admin"
+                style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textDecoration: 'underline' }}
+                title="If your Instagram App is configured for Basic Display"
+              >
+                via Basic Display
+              </a>
             </div>
           </div>
 

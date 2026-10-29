@@ -196,7 +196,7 @@ export function getFacebookScopes(): string {
 /**
  * Standard Instagram OAuth Scopes.
  */
-export const DEFAULT_INSTAGRAM_SCOPES = 'instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_messages';
+export const DEFAULT_INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
 
 export function getInstagramScopes(): string {
   return readEnvKey('INSTAGRAM_SCOPES') || DEFAULT_INSTAGRAM_SCOPES;
