@@ -53,10 +53,15 @@ export async function GET(
   // 2. INSTAGRAM OAUTH
   if (platformKey === 'instagram') {
     const redirectUri = getInstagramOAuthRedirectUri(request);
-    const mode = searchParams.get('mode'); // 'instagram_login' (default) or 'meta_dialog'
+    const mode = searchParams.get('mode');
 
-    if (mode === 'meta_dialog') {
-      const { clientId, clientSecret } = getCleanFacebookCredentials();
+    const igCreds = getCleanInstagramCredentials();
+    const fbCreds = getCleanFacebookCredentials();
+    const isUsingFacebookApp = !igCreds.clientId || igCreds.clientId === fbCreds.clientId;
+
+    // Use Meta Dialog whenever requested OR when using Facebook App credentials (since instagram.com rejects FB App IDs)
+    if (mode === 'meta_dialog' || isUsingFacebookApp || mode !== 'direct') {
+      const { clientId, clientSecret } = fbCreds.clientId ? fbCreds : igCreds;
       if (!clientId || !clientSecret) {
         return NextResponse.redirect(
           new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
@@ -69,8 +74,8 @@ export async function GET(
       return NextResponse.redirect(authUrl);
     }
 
-    // Direct Instagram OAuth (Instagram Login for Professionals / Business)
-    const { clientId, clientSecret } = getCleanInstagramCredentials();
+    // Direct standalone Instagram OAuth (Only for dedicated Instagram App IDs)
+    const { clientId, clientSecret } = igCreds;
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
         new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)

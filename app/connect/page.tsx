@@ -533,7 +533,7 @@ function ConnectContent() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <a
-                href="/api/oauth/instagram?userId=admin"
+                href="/api/oauth/instagram?mode=meta_dialog&userId=admin"
                 className="btn btn-primary"
                 style={{
                   background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
