@@ -6,7 +6,7 @@ import path from 'path';
  * The canonical production base URL for PublishingFlow.
  * Guaranteed to NEVER have a trailing slash.
  */
-export const CANONICAL_APP_BASE_URL = 'https://publishingflow-rc85.vercel.app';
+export const CANONICAL_APP_BASE_URL = 'https://viralkamflow.vercel.app';
 
 /**
  * Returns the sanitized base URL of the application.
@@ -106,17 +106,17 @@ function readEnvKey(key: string): string | undefined {
  */
 export function getCleanFacebookCredentials(): { clientId: string; clientSecret?: string } {
   const rawId = (
+    readEnvKey('META_CLIENT_ID') ||
     readEnvKey('FACEBOOK_APP_ID') ||
     readEnvKey('FACEBOOK_CLIENT_ID') ||
-    readEnvKey('META_CLIENT_ID') ||
     readEnvKey('META_APP_ID') ||
     ''
   ).trim();
 
   const rawSecret = (
+    readEnvKey('META_CLIENT_SECRET') ||
     readEnvKey('FACEBOOK_APP_SECRET') ||
     readEnvKey('FACEBOOK_CLIENT_SECRET') ||
-    readEnvKey('META_CLIENT_SECRET') ||
     readEnvKey('META_APP_SECRET') ||
     ''
   ).trim();
@@ -187,7 +187,7 @@ export function getCleanThreadsCredentials(): { clientId: string; clientSecret?:
  * Standard Facebook OAuth Scopes for Page connection, posting & Auto-Reply.
  * (pages_manage_posts is deprecated/rejected by Meta v19+, replaced by active scopes)
  */
-export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_read_engagement,pages_messaging,pages_manage_metadata';
+export const DEFAULT_FACEBOOK_SCOPES = 'public_profile,pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,pages_read_user_content';
 
 export function getFacebookScopes(): string {
   return readEnvKey('FACEBOOK_SCOPES') || readEnvKey('META_FACEBOOK_SCOPES') || DEFAULT_FACEBOOK_SCOPES;
@@ -209,4 +209,16 @@ export const DEFAULT_THREADS_SCOPES = 'threads_basic,threads_content_publish';
 
 export function getThreadsScopes(): string {
   return readEnvKey('THREADS_SCOPES') || DEFAULT_THREADS_SCOPES;
+}
+
+/**
+ * Meta Unified Login Configuration ID (config_id)
+ */
+export function getMetaConfigId(): string | undefined {
+  return (
+    readEnvKey('META_CONFIG_ID') ||
+    readEnvKey('INSTAGRAM_CONFIG_ID') ||
+    readEnvKey('CONFIG_ID') ||
+    undefined
+  );
 }

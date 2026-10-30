@@ -9,6 +9,7 @@ import {
   getFacebookScopes,
   getInstagramScopes,
   getThreadsScopes,
+  getMetaConfigId,
 } from '@/lib/oauthUrl';
 
 /**
@@ -31,7 +32,7 @@ export async function GET(
   const stateData = JSON.stringify({ accountId: accountId || null, userId });
   const stateQuery = `&state=${encodeURIComponent(Buffer.from(stateData).toString('base64'))}`;
 
-  // 1. FACEBOOK OAUTH
+  // 1. FACEBOOK OAUTH (100% Facebook Pages Login - ZERO Instagram)
   if (platformKey === 'facebook' || platformKey === 'meta') {
     const { clientId, clientSecret } = getCleanFacebookCredentials();
 
@@ -50,7 +51,7 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
-  // 2. INSTAGRAM OAUTH (100% Direct Instagram Login - Zero Facebook)
+  // 2. INSTAGRAM OAUTH (Unified Login or Direct Instagram Login)
   if (platformKey === 'instagram') {
     const redirectUri = getInstagramOAuthRedirectUri(request);
     const { clientId, clientSecret } = getCleanInstagramCredentials();
@@ -61,11 +62,21 @@ export async function GET(
       );
     }
 
-    const scopeParam = searchParams.get('scope');
-    const scopes = scopeParam || getInstagramScopes();
-    const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
+    const mode = searchParams.get('mode');
+    const configId = searchParams.get('config_id') || getMetaConfigId();
+
+    let authUrl: string;
+    if (configId && mode !== 'direct') {
+      authUrl = `https://www.facebook.com/dialog/oauth?client_id=${clientId}&config_id=${configId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&response_type=code${stateQuery}`;
+    } else {
+      const scopeParam = searchParams.get('scope');
+      const scopes = scopeParam || getInstagramScopes();
+      authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
+    }
 
     return NextResponse.redirect(authUrl);
   }

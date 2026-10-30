@@ -5,13 +5,15 @@ import {
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
 } from './oauthUrl';
+import { getUserData, saveUserData } from './userStore';
 
 /**
  * Server-Side OAuth Token Manager with Automatic Refresh
  * 
  * CRITICAL SECURITY:
  * - Tokens and secrets NEVER leave the server.
- * - Auto-refreshes Meta and Threads tokens when expired or nearing expiration.
+ * - Auto-refreshes Meta and Threads tokens when expired or nearing expiration (< 24 hours).
+ * - Seamlessly supports both Supabase database and local userStore.
  */
 export async function getValidAccessToken(accountId: string): Promise<{
   accessToken: string;
@@ -20,17 +22,50 @@ export async function getValidAccessToken(accountId: string): Promise<{
   clientName: string;
 }> {
   const supabase = createServerSupabaseClient();
-  if (!supabase) {
-    throw new Error('Supabase server configuration is missing.');
+  let account: any = null;
+  let source: 'supabase' | 'userStore' = 'supabase';
+  let userStoreUserId = 'admin';
+
+  // 1. Try Supabase if configured
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .or(`id.eq.${accountId},oauth_account_id.eq.${accountId}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        account = data;
+        source = 'supabase';
+      }
+    } catch (e) {
+      console.warn('[getValidAccessToken] Supabase lookup error:', e);
+    }
   }
 
-  const { data: account, error } = await supabase
-    .from('accounts')
-    .select('*')
-    .eq('id', accountId)
-    .single();
+  // 2. Fallback to userStore if not found in Supabase
+  if (!account) {
+    const adminData = await getUserData('admin');
+    const acc = adminData?.accounts?.find(
+      (a: any) => a.id === accountId || a.oauthAccountId === accountId
+    );
+    if (acc) {
+      account = {
+        id: acc.id,
+        client_name: acc.clientName,
+        platform: acc.platform,
+        connection_type: acc.connectionType,
+        oauth_access_token: acc.oauthAccessToken,
+        oauth_account_id: acc.oauthAccountId,
+        oauth_token_expires_at: acc.oauthTokenExpiresAt,
+      };
+      source = 'userStore';
+      userStoreUserId = 'admin';
+    }
+  }
 
-  if (error || !account) {
+  if (!account) {
     throw new Error(`Account not found for ID: ${accountId}`);
   }
 
@@ -44,9 +79,10 @@ export async function getValidAccessToken(accountId: string): Promise<{
 
   const now = Date.now();
   const expiresAt = account.oauth_token_expires_at ? new Date(account.oauth_token_expires_at).getTime() : null;
-  const isExpiringSoon = expiresAt ? (expiresAt - now) < 5 * 60 * 1000 : false;
+  // If expiring in next 24 hours, auto-refresh
+  const isExpiringSoon = expiresAt ? (expiresAt - now) < 24 * 60 * 60 * 1000 : false;
 
-  // If token is still valid, return it
+  // If token is still valid, return it directly
   if (!isExpiringSoon && account.oauth_access_token) {
     return {
       accessToken: account.oauth_access_token,
@@ -133,16 +169,36 @@ export async function getValidAccessToken(accountId: string): Promise<{
       }
     }
 
-    // Update refreshed token in Supabase server-side
+    // Persist refreshed token server-side
     if (refreshedToken !== account.oauth_access_token) {
-      await supabase
-        .from('accounts')
-        .update({
-          oauth_access_token: refreshedToken,
-          ...(newExpiresAt ? { oauth_token_expires_at: newExpiresAt } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', account.id);
+      if (supabase && source === 'supabase') {
+        await supabase
+          .from('accounts')
+          .update({
+            oauth_access_token: refreshedToken,
+            ...(newExpiresAt ? { oauth_token_expires_at: newExpiresAt } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', account.id);
+      }
+
+      // Also update in userStore
+      try {
+        const uData = await getUserData(userStoreUserId);
+        if (uData) {
+          const accIdx = uData.accounts.findIndex(
+            (a: any) => a.id === account.id || a.oauthAccountId === account.oauth_account_id
+          );
+          if (accIdx >= 0) {
+            uData.accounts[accIdx].oauthAccessToken = refreshedToken;
+            if (newExpiresAt) uData.accounts[accIdx].oauthTokenExpiresAt = newExpiresAt;
+            uData.accounts[accIdx].updatedAt = new Date().toISOString();
+            await saveUserData(userStoreUserId, uData);
+          }
+        }
+      } catch (storeErr) {
+        console.warn('[userStore update token warning]:', storeErr);
+      }
 
       await logAudit({
         action: 'TOKEN_REFRESHED',

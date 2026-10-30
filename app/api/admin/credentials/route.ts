@@ -54,14 +54,32 @@ export async function POST(req: NextRequest) {
       process.env[key] = cleanVal;
     };
 
-    if (body.facebookAppId) updateEnvVar('FACEBOOK_APP_ID', body.facebookAppId);
-    if (body.facebookAppSecret) updateEnvVar('FACEBOOK_APP_SECRET', body.facebookAppSecret);
+    if (body.facebookAppId) {
+      updateEnvVar('FACEBOOK_APP_ID', body.facebookAppId);
+      updateEnvVar('META_CLIENT_ID', body.facebookAppId);
+    }
+    if (body.facebookAppSecret) {
+      updateEnvVar('FACEBOOK_APP_SECRET', body.facebookAppSecret);
+      updateEnvVar('META_CLIENT_SECRET', body.facebookAppSecret);
+    }
 
-    if (body.instagramAppId) updateEnvVar('INSTAGRAM_APP_ID', body.instagramAppId);
-    if (body.instagramAppSecret) updateEnvVar('INSTAGRAM_APP_SECRET', body.instagramAppSecret);
+    if (body.instagramAppId) {
+      updateEnvVar('INSTAGRAM_APP_ID', body.instagramAppId);
+      updateEnvVar('INSTAGRAM_CLIENT_ID', body.instagramAppId);
+    }
+    if (body.instagramAppSecret) {
+      updateEnvVar('INSTAGRAM_APP_SECRET', body.instagramAppSecret);
+      updateEnvVar('INSTAGRAM_CLIENT_SECRET', body.instagramAppSecret);
+    }
 
-    if (body.threadsAppId) updateEnvVar('THREADS_APP_ID', body.threadsAppId);
-    if (body.threadsAppSecret) updateEnvVar('THREADS_APP_SECRET', body.threadsAppSecret);
+    if (body.threadsAppId) {
+      updateEnvVar('THREADS_APP_ID', body.threadsAppId);
+      updateEnvVar('THREADS_CLIENT_ID', body.threadsAppId);
+    }
+    if (body.threadsAppSecret) {
+      updateEnvVar('THREADS_APP_SECRET', body.threadsAppSecret);
+      updateEnvVar('THREADS_CLIENT_SECRET', body.threadsAppSecret);
+    }
 
     fs.writeFileSync(envPath, envContent.trim() + '\n', 'utf8');
 
