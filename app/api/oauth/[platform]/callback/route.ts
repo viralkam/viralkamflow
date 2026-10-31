@@ -445,13 +445,93 @@ export async function GET(
       }
     }
 
-    return NextResponse.redirect(
-      new URL(`/connect?connected=true&platform=${platformKey}&name=${encodeURIComponent(clientName)}`, request.url)
-    );
+    const safeClientName = (clientName || 'Account').replace(/'/g, "\\'");
+    const successHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Connection Successful — Karmflow</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8fafc; color: #0f172a; }
+      .card { background: white; padding: 2.25rem; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); text-align: center; max-width: 380px; border: 1px solid #e2e8f0; }
+      .icon { width: 52px; height: 52px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 26px; }
+      h2 { margin: 0 0 0.5rem; font-size: 1.3rem; }
+      p { margin: 0; color: #64748b; font-size: 0.92rem; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">✓</div>
+      <h2>Connected!</h2>
+      <p><strong>${clientName}</strong> connected successfully. Window closing...</p>
+    </div>
+    <script>
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'OAUTH_SUCCESS',
+            platform: '${platformKey}',
+            name: '${safeClientName}'
+          }, '*');
+          setTimeout(function() { window.close(); }, 600);
+        } else {
+          window.location.href = '/connect?connected=true&platform=${platformKey}&name=${encodeURIComponent(clientName)}';
+        }
+      } catch (e) {
+        window.location.href = '/connect?connected=true&platform=${platformKey}&name=${encodeURIComponent(clientName)}';
+      }
+    </script>
+  </body>
+</html>`;
+
+    return new NextResponse(successHtml, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   } catch (err: any) {
     console.error('OAuth Callback Exchange Error:', err);
-    return NextResponse.redirect(
-      new URL(`/connect?error=oauth_exchange_failed&platform=${platformKey}&message=${encodeURIComponent(err.message || '')}`, request.url)
-    );
+    const safeErrMsg = (err.message || 'Authentication exchange failed').replace(/'/g, "\\'");
+    const errorHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Connection Error — Karmflow</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8fafc; color: #0f172a; }
+      .card { background: white; padding: 2.25rem; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); text-align: center; max-width: 400px; border: 1px solid #fee2e2; }
+      .icon { width: 52px; height: 52px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 26px; }
+      h2 { margin: 0 0 0.5rem; font-size: 1.3rem; color: #991b1b; }
+      p { margin: 0; color: #64748b; font-size: 0.92rem; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">✕</div>
+      <h2>Connection Error</h2>
+      <p>${(err.message || 'Authentication exchange failed').replace(/"/g, '&quot;')}</p>
+    </div>
+    <script>
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'OAUTH_ERROR',
+            platform: '${platformKey}',
+            message: '${safeErrMsg}'
+          }, '*');
+          setTimeout(function() { window.close(); }, 2500);
+        } else {
+          window.location.href = '/connect?error=oauth_exchange_failed&platform=${platformKey}&message=${encodeURIComponent(err.message || '')}';
+        }
+      } catch (e) {
+        window.location.href = '/connect?error=oauth_exchange_failed&platform=${platformKey}';
+      }
+    </script>
+  </body>
+</html>`;
+
+    return new NextResponse(errorHtml, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   }
 }

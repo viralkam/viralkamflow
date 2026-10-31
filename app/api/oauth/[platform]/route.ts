@@ -63,19 +63,20 @@ export async function GET(
     }
 
     const mode = searchParams.get('mode');
+    const dedicatedIgId = process.env.INSTAGRAM_CLIENT_ID || process.env.INSTAGRAM_APP_ID;
+    const isDistinctIgApp = dedicatedIgId && dedicatedIgId !== clientId;
 
     let authUrl: string;
-    // Only use Facebook Business dialog if explicitly requested with mode=business
-    if (mode === 'business') {
-      const configId = searchParams.get('config_id') || getMetaConfigId();
-      authUrl = `https://www.facebook.com/dialog/oauth?client_id=${clientId}&config_id=${configId}&redirect_uri=${encodeURIComponent(
+    if (isDistinctIgApp || mode === 'direct_instagram') {
+      const targetId = dedicatedIgId || clientId;
+      const scopes = searchParams.get('scope') || 'user_profile,user_media';
+      authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${targetId}&redirect_uri=${encodeURIComponent(
         redirectUri
-      )}&response_type=code${stateQuery}`;
+      )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
     } else {
-      // DEFAULT: Direct Instagram ID & Password page (instagram.com)
-      const scopeParam = searchParams.get('scope');
-      const scopes = scopeParam || getInstagramScopes();
-      authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      // Standard Meta OAuth for Instagram Graph API (Clean login dialog, works directly with Meta App ID)
+      const scopes = searchParams.get('scope') || 'instagram_basic,instagram_content_publish,instagram_manage_comments,pages_show_list,pages_read_engagement';
+      authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
     }

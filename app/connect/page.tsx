@@ -117,7 +117,46 @@ function ConnectContent() {
     }
   };
 
+  const openOAuthPopup = (url: string, title = 'Connect Account') => {
+    if (typeof window === 'undefined') return;
+    const width = 640;
+    const height = 760;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const popup = window.open(
+      url,
+      title,
+      `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const timer = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(timer);
+        refreshData();
+      }
+    }, 1500);
+
+    return popup;
+  };
+
   useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== 'object') return;
+      if (event.data.type === 'OAUTH_SUCCESS') {
+        const platformDisplay = event.data.platform
+          ? event.data.platform.charAt(0).toUpperCase() + event.data.platform.slice(1)
+          : 'Account';
+        setSuccessMsg(`${platformDisplay} connected successfully${event.data.name ? `: @${event.data.name}` : ''}!`);
+        refreshData();
+        setTimeout(() => setSuccessMsg(null), 6000);
+      } else if (event.data.type === 'OAUTH_ERROR') {
+        setErrorMsg(`Connection notice: ${event.data.message || 'Authentication failed'}. Please try again.`);
+        setTimeout(() => setErrorMsg(null), 7000);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
     const connected = searchParams.get('connected');
     const platform = searchParams.get('platform');
     const name = searchParams.get('name');
@@ -140,6 +179,8 @@ function ConnectContent() {
       }
       setTimeout(() => setErrorMsg(null), 7000);
     }
+
+    return () => window.removeEventListener('message', handleMessage);
   }, [searchParams, refreshData]);
 
   const connectedAccounts = accounts.filter(
@@ -532,18 +573,21 @@ function ConnectContent() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <a
-                href="/api/oauth/instagram?userId=admin"
+              <button
+                type="button"
+                onClick={() => openOAuthPopup('/api/oauth/instagram?userId=admin', 'Connect Instagram')}
                 className="btn btn-primary"
                 style={{
                   background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
                   padding: '0.75rem 1.4rem',
                   fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  border: 'none',
                 }}
               >
                 <Link2 size={17} />
                 <span>{igAccounts.length > 0 ? 'Add / Reconnect Instagram' : 'Connect Instagram'}</span>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -649,14 +693,15 @@ function ConnectContent() {
               </div>
             </div>
 
-            <a
-              href="/api/oauth/facebook?userId=admin"
+            <button
+              type="button"
+              onClick={() => openOAuthPopup('/api/oauth/facebook?userId=admin', 'Connect Facebook')}
               className="btn btn-primary"
-              style={{ background: '#1877f2', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
+              style={{ background: '#1877f2', padding: '0.75rem 1.4rem', fontSize: '0.92rem', cursor: 'pointer', border: 'none' }}
             >
               <Link2 size={17} />
               <span>{fbAccounts.length > 0 ? 'Add / Reconnect Facebook' : 'Connect Facebook'}</span>
-            </a>
+            </button>
           </div>
 
           {/* Facebook Connected List */}
@@ -761,14 +806,15 @@ function ConnectContent() {
               </div>
             </div>
 
-            <a
-              href="/api/oauth/threads?userId=admin"
+            <button
+              type="button"
+              onClick={() => openOAuthPopup('/api/oauth/threads?userId=admin', 'Connect Threads')}
               className="btn btn-primary"
-              style={{ background: '#0f172a', color: '#ffffff', padding: '0.75rem 1.4rem', fontSize: '0.92rem' }}
+              style={{ background: '#0f172a', color: '#ffffff', padding: '0.75rem 1.4rem', fontSize: '0.92rem', cursor: 'pointer', border: 'none' }}
             >
               <Link2 size={17} />
               <span>{thAccounts.length > 0 ? 'Add / Reconnect Threads' : 'Connect Threads'}</span>
-            </a>
+            </button>
           </div>
 
           {/* Threads Connected List */}
