@@ -8,6 +8,7 @@ import {
   getCleanThreadsCredentials,
 } from '@/lib/oauthUrl';
 import { addAccountToUser } from '@/lib/userStore';
+import { getD1Config, saveD1Account } from '@/lib/cloudflareD1';
 
 /**
  * Server-Side OAuth Callback Handler
@@ -447,6 +448,28 @@ export async function GET(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
+
+        // Also save to Cloudflare D1 Database if configured (Persistent across Vercel deployments)
+        try {
+          const { isConfigured } = getD1Config();
+          if (isConfigured) {
+            await saveD1Account(targetUserId, {
+              id: targetAccountId,
+              clientName: clientName || (platformKey === 'facebook' ? 'Facebook Page' : platformKey === 'threads' ? 'Threads Account' : 'Instagram Account'),
+              platform: formattedPlatform as any,
+              connectionType: 'oauth',
+              connectionStatus: 'Connected',
+              oauthAccountId: accountId,
+              oauthAccessToken: accessToken,
+              oauthRefreshToken: refreshToken || undefined,
+              oauthTokenExpiresAt: expiresAt || undefined,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (d1SaveErr) {
+          console.warn('[D1 OAuth Account Save Error]:', d1SaveErr);
+        }
       }
 
       // 3. Log to audit trail

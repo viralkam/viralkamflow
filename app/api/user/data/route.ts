@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserData, saveUserData } from '@/lib/userStore';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { mapPostFromDb, mapAccountFromDb } from '@/lib/supabase';
+import { getD1Config, getD1Accounts, getD1Posts } from '@/lib/cloudflareD1';
 
 export async function GET(req: NextRequest) {
   const sessionUserId = req.cookies.get('pf_session_user_id')?.value || 'admin';
@@ -22,8 +23,36 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  // Merge accounts & posts from Supabase DB in parallel with fast 1s timeout
-  // If Supabase cloud is slow/sleeping, local data returns instantly (< 10ms) with zero UI lag!
+  // 1. Cloudflare D1 Database Sync (Primary Serverless Database)
+  const d1Config = getD1Config();
+  if (d1Config.isConfigured) {
+    try {
+      const [d1Accs, d1Posts] = await Promise.all([
+        getD1Accounts(sessionUserId),
+        getD1Posts(sessionUserId),
+      ]);
+
+      if (d1Accs && d1Accs.length > 0) {
+        const accMap = new Map();
+        for (const a of [...d1Accs, ...(userData.accounts || [])]) {
+          accMap.set(a.id, a);
+        }
+        userData.accounts = Array.from(accMap.values());
+      }
+
+      if (d1Posts && d1Posts.length > 0) {
+        const postMap = new Map();
+        for (const p of [...d1Posts, ...(userData.posts || [])]) {
+          postMap.set(p.id, p);
+        }
+        userData.posts = Array.from(postMap.values());
+      }
+    } catch (d1Err) {
+      console.warn('[UserData D1 Sync Notice]:', d1Err);
+    }
+  }
+
+  // 2. Supabase DB Sync (If configured)
   const supabase = createServerSupabaseClient();
   if (supabase) {
     try {

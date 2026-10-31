@@ -528,9 +528,19 @@ export async function addAccountToUser(userId: string, account: Account): Promis
  */
 export async function removeAccountFromUser(userId: string, accountId: string): Promise<boolean> {
   const data = await getUserData(userId);
-  if (!data) return false;
+  if (data) {
+    data.accounts = data.accounts.filter(a => a.id !== accountId);
+    await saveUserData(userId, data);
+  }
 
-  data.accounts = data.accounts.filter(a => a.id !== accountId);
-  await saveUserData(userId, data);
+  try {
+    const { getD1Config, deleteD1Account } = await import('@/lib/cloudflareD1');
+    if (getD1Config().isConfigured) {
+      await deleteD1Account(accountId);
+    }
+  } catch (d1Err) {
+    console.warn('[UserStore D1 Delete Error]:', d1Err);
+  }
+
   return true;
 }
