@@ -63,14 +63,16 @@ export async function GET(
     }
 
     const mode = searchParams.get('mode');
-    const configId = searchParams.get('config_id') || getMetaConfigId();
 
     let authUrl: string;
-    if (configId && mode !== 'direct') {
+    // Only use Facebook Business dialog if explicitly requested with mode=business
+    if (mode === 'business') {
+      const configId = searchParams.get('config_id') || getMetaConfigId();
       authUrl = `https://www.facebook.com/dialog/oauth?client_id=${clientId}&config_id=${configId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&response_type=code${stateQuery}`;
     } else {
+      // DEFAULT: Direct Instagram ID & Password page (instagram.com)
       const scopeParam = searchParams.get('scope');
       const scopes = scopeParam || getInstagramScopes();
       authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
