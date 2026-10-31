@@ -145,21 +145,41 @@ export async function GET(
           console.warn('Long lived exchange warning:', e);
         }
 
-        // Query linked Instagram Business Account from managed pages
-        const accountsRes = await fetch(
-          `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${userAccessToken}`
-        );
-        const accountsData = await accountsRes.json();
-
         let igFound = false;
-        if (accountsData.data && Array.isArray(accountsData.data)) {
-          for (const page of accountsData.data) {
-            if (page.instagram_business_account) {
-              accountId = page.instagram_business_account.id;
-              clientName = page.instagram_business_account.username || page.instagram_business_account.name || page.name;
-              accessToken = page.access_token || userAccessToken;
-              igFound = true;
-              break;
+
+        // 1. Direct Instagram Accounts linked to Meta user profile (NO FB Pages needed!)
+        try {
+          const directIgRes = await fetch(
+            `https://graph.facebook.com/v22.0/me?fields=id,name,instagram_accounts{id,username,name}&access_token=${userAccessToken}`
+          );
+          const directIgData = await directIgRes.json();
+          if (directIgData.instagram_accounts?.data && directIgData.instagram_accounts.data.length > 0) {
+            const directAccount = directIgData.instagram_accounts.data[0];
+            accountId = directAccount.id;
+            clientName = directAccount.username || directAccount.name || 'Instagram Account';
+            accessToken = userAccessToken;
+            igFound = true;
+          }
+        } catch (dirErr) {
+          console.warn('[IG Callback] Direct instagram_accounts query warning:', dirErr);
+        }
+
+        // 2. Query linked Instagram Business Account from managed pages (fallback)
+        if (!igFound) {
+          const accountsRes = await fetch(
+            `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${userAccessToken}`
+          );
+          const accountsData = await accountsRes.json();
+
+          if (accountsData.data && Array.isArray(accountsData.data)) {
+            for (const page of accountsData.data) {
+              if (page.instagram_business_account) {
+                accountId = page.instagram_business_account.id;
+                clientName = page.instagram_business_account.username || page.instagram_business_account.name || page.name;
+                accessToken = page.access_token || userAccessToken;
+                igFound = true;
+                break;
+              }
             }
           }
         }

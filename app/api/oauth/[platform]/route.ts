@@ -74,11 +74,11 @@ export async function GET(
         redirectUri
       )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
     } else {
-      // Standard Meta OAuth for Instagram Graph API (Clean login dialog, works directly with Meta App ID)
-      const scopes = searchParams.get('scope') || 'instagram_basic,instagram_content_publish,instagram_manage_comments,pages_show_list,pages_read_engagement';
+      // Pure Instagram Scopes (NO Facebook Page scopes!)
+      const scopes = searchParams.get('scope') || getInstagramScopes() || 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
       authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
-      )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
+      )}&scope=${encodeURIComponent(scopes)}&auth_type=rerequest&response_type=code${stateQuery}`;
     }
 
     return NextResponse.redirect(authUrl);
