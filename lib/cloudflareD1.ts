@@ -32,7 +32,7 @@ export function getD1Config(): {
   const databaseId = (
     process.env.CLOUDFLARE_D1_DATABASE_ID ||
     process.env.CLOUDFLARE_DATABASE_ID ||
-    ''
+    '33502e5e-a35b-42ee-b00b-febe2fe8025b'
   ).trim();
 
   const apiToken = (
