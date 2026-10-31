@@ -85,7 +85,8 @@ export function Sidebar() {
   const { user, logout } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (!user.loggedIn) return null;
+  const isPublicLegalPage = ['/privacy', '/terms', '/data-deletion'].includes(pathname);
+  if (isPublicLegalPage || !user.loggedIn) return null;
 
   const handleRefresh = async () => {
     await logout(); // re-runs refreshData()
