@@ -51,35 +51,26 @@ export async function GET(
     return NextResponse.redirect(authUrl);
   }
 
-  // 2. INSTAGRAM OAUTH (Unified Login or Direct Instagram Login)
+  // 2. INSTAGRAM OAUTH (Independent Instagram API with Instagram Login)
+  // Official Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
   if (platformKey === 'instagram') {
     const redirectUri = getInstagramOAuthRedirectUri(request);
     const { clientId, clientSecret } = getCleanInstagramCredentials();
 
+    // If Instagram credentials are not configured, do not invent or fallback to Facebook
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=instagram', request.url)
+        new URL('/connect?error=instagram_not_configured&platform=instagram', request.url)
       );
     }
 
-    const mode = searchParams.get('mode');
-    const dedicatedIgId = process.env.INSTAGRAM_CLIENT_ID || process.env.INSTAGRAM_APP_ID;
-    const isDistinctIgApp = dedicatedIgId && dedicatedIgId !== clientId;
+    const scopeParam = searchParams.get('scope');
+    const scopes = scopeParam || getInstagramScopes() || 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
 
-    let authUrl: string;
-    if (isDistinctIgApp || mode === 'direct_instagram') {
-      const targetId = dedicatedIgId || clientId;
-      const scopes = searchParams.get('scope') || 'user_profile,user_media';
-      authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${targetId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
-    } else {
-      // Pure Instagram Scopes (NO Facebook Page scopes!)
-      const scopes = searchParams.get('scope') || getInstagramScopes() || 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
-      authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&scope=${encodeURIComponent(scopes)}&auth_type=rerequest&response_type=code${stateQuery}`;
-    }
+    // Direct Instagram OAuth Authorization URL
+    const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
 
     return NextResponse.redirect(authUrl);
   }

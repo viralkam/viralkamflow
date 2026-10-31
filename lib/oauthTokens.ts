@@ -115,13 +115,7 @@ export async function getValidAccessToken(accountId: string): Promise<{
         newExpiresAt = new Date(Date.now() + (metaData.expires_in || 5184000) * 1000).toISOString();
       }
     } else if (account.platform === 'Instagram') {
-      const { clientId, clientSecret } = getCleanInstagramCredentials();
-      const fbCreds = getCleanFacebookCredentials();
-
       console.log(`[OAuth Auto-Refresh]: Refreshing Instagram token for account ${account.client_name}...`);
-      let refreshed = false;
-
-      // 1. Try Instagram refresh endpoint (for direct Instagram Login)
       try {
         const igRefreshRes = await fetch(
           `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${account.oauth_access_token}`
@@ -130,22 +124,9 @@ export async function getValidAccessToken(accountId: string): Promise<{
         if (igRefreshRes.ok && igRefreshData.access_token) {
           refreshedToken = igRefreshData.access_token;
           newExpiresAt = new Date(Date.now() + (igRefreshData.expires_in || 5184000) * 1000).toISOString();
-          refreshed = true;
         }
-      } catch {}
-
-      // 2. Fallback to Meta exchange endpoint (for Page-linked Instagram tokens)
-      if (!refreshed && fbCreds.clientId && fbCreds.clientSecret) {
-        try {
-          const metaRes = await fetch(
-            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${fbCreds.clientId}&client_secret=${fbCreds.clientSecret}&fb_exchange_token=${account.oauth_access_token}`
-          );
-          const metaData = await metaRes.json();
-          if (metaRes.ok && metaData.access_token) {
-            refreshedToken = metaData.access_token;
-            newExpiresAt = new Date(Date.now() + (metaData.expires_in || 5184000) * 1000).toISOString();
-          }
-        } catch {}
+      } catch (igRefreshErr) {
+        console.warn('[OAuth Auto-Refresh] Instagram refresh error:', igRefreshErr);
       }
     } else if (account.platform === 'Threads') {
       const { clientSecret } = getCleanThreadsCredentials();

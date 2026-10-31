@@ -170,14 +170,14 @@ function ConnectContent() {
 
     const error = searchParams.get('error');
     if (error) {
-      if (error === 'oauth_not_configured') {
-        const p = searchParams.get('platform') || 'platform';
-        setErrorMsg(`New ${p} App ID/Secret is not configured yet. Click "Configure App Credentials" below to add it.`);
+      if (error === 'oauth_not_configured' || error === 'instagram_not_configured') {
+        const p = searchParams.get('platform') || 'Instagram';
+        setErrorMsg(`Independent ${p} App ID & Secret is not configured yet. Please enter INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET below.`);
         setShowConfig(true);
       } else {
         setErrorMsg(`Connection notice: ${error}. Please try again.`);
       }
-      setTimeout(() => setErrorMsg(null), 7000);
+      setTimeout(() => setErrorMsg(null), 8000);
     }
 
     return () => window.removeEventListener('message', handleMessage);

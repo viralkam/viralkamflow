@@ -50,8 +50,11 @@ export function getFacebookOAuthRedirectUri(request?: NextRequest): string {
 
 /**
  * Isolated callback URL for Instagram OAuth.
+ * Supports custom INSTAGRAM_REDIRECT_URI from environment.
  */
 export function getInstagramOAuthRedirectUri(request?: NextRequest): string {
+  const custom = readEnvKey('INSTAGRAM_REDIRECT_URI');
+  if (custom) return custom;
   const base = getAppBaseUrl(request);
   return `${base}/api/oauth/instagram/callback`;
 }
@@ -133,23 +136,19 @@ export function getCleanMetaCredentials(): { clientId: string; clientSecret?: st
 
 /**
  * Resolves dedicated Instagram App Credentials.
- * Configured via INSTAGRAM_APP_ID & INSTAGRAM_APP_SECRET (or INSTAGRAM_CLIENT_ID / INSTAGRAM_CLIENT_SECRET).
- * NO OLD HARDCODED FALLBACK!
+ * Configured EXCLUSIVELY via INSTAGRAM_CLIENT_ID & INSTAGRAM_CLIENT_SECRET (or INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET).
+ * ZERO fallback to Facebook or Meta App credentials!
  */
 export function getCleanInstagramCredentials(): { clientId: string; clientSecret?: string } {
   const rawId = (
-    readEnvKey('INSTAGRAM_APP_ID') ||
     readEnvKey('INSTAGRAM_CLIENT_ID') ||
-    readEnvKey('FACEBOOK_APP_ID') ||
-    readEnvKey('META_CLIENT_ID') ||
+    readEnvKey('INSTAGRAM_APP_ID') ||
     ''
   ).trim();
 
   const rawSecret = (
-    readEnvKey('INSTAGRAM_APP_SECRET') ||
     readEnvKey('INSTAGRAM_CLIENT_SECRET') ||
-    readEnvKey('FACEBOOK_APP_SECRET') ||
-    readEnvKey('META_CLIENT_SECRET') ||
+    readEnvKey('INSTAGRAM_APP_SECRET') ||
     ''
   ).trim();
 

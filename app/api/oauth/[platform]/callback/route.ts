@@ -61,162 +61,67 @@ export async function GET(
 
     if (platformKey === 'instagram') {
       const { clientId: igClientId, clientSecret: igClientSecret } = getCleanInstagramCredentials();
-      const { clientId: metaClientId, clientSecret: metaClientSecret } = getCleanFacebookCredentials();
 
-      let igExchangeSuccess = false;
-
-      // 1. Attempt direct Instagram Login OAuth exchange (api.instagram.com)
-      try {
-        const igTokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: igClientId,
-            client_secret: igClientSecret || metaClientSecret || '',
-            grant_type: 'authorization_code',
-            redirect_uri: redirectUri,
-            code,
-          }),
-        });
-        const igTokenData = await igTokenRes.json();
-
-        if (igTokenRes.ok && igTokenData.access_token) {
-          let igAccessToken = igTokenData.access_token;
-          accountId = String(igTokenData.user_id || `ig-${Date.now()}`);
-
-          // Exchange for 60-day long-lived token
-          try {
-            const longLivedRes = await fetch(
-              `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${igClientSecret || metaClientSecret}&access_token=${igAccessToken}`
-            );
-            const longLivedData = await longLivedRes.json();
-            if (longLivedData.access_token) {
-              igAccessToken = longLivedData.access_token;
-              expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
-            }
-          } catch (longErr) {
-            console.warn('[IG OAuth] Long-lived exchange error:', longErr);
-          }
-
-          accessToken = igAccessToken;
-
-          // Fetch Instagram profile username
-          try {
-            const meRes = await fetch(
-              `https://graph.instagram.com/v22.0/me?fields=id,username,name&access_token=${accessToken}`
-            );
-            const meData = await meRes.json();
-            clientName = meData.username || meData.name || 'Instagram User';
-            if (meData.id) accountId = meData.id;
-          } catch {
-            clientName = 'Instagram Account';
-          }
-
-          igExchangeSuccess = true;
-        }
-      } catch (igDirectErr) {
-        console.warn('[IG OAuth] Direct exchange attempt error:', igDirectErr);
+      if (!igClientId || !igClientSecret) {
+        throw new Error('INSTAGRAM_CLIENT_ID or INSTAGRAM_CLIENT_SECRET is not configured in .env.local');
       }
 
-      // 2. If direct exchange did not succeed, fallback to Meta Facebook Graph API exchange
-      if (!igExchangeSuccess) {
-        const tokenRes = await fetch(
-          `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${metaClientId}&redirect_uri=${encodeURIComponent(
-            redirectUri
-          )}&client_secret=${metaClientSecret}&code=${code}`
+      // 1. Direct Instagram Login OAuth Exchange (api.instagram.com)
+      // Official Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
+      const igTokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: igClientId,
+          client_secret: igClientSecret,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri,
+          code,
+        }),
+      });
+
+      const igTokenData = await igTokenRes.json();
+
+      if (!igTokenRes.ok || !igTokenData.access_token) {
+        const errorDetail = igTokenData.error_message || igTokenData.error?.message || igTokenData.message || 'Failed to exchange Instagram authorization code';
+        throw new Error(`Instagram Login Exchange Failed: ${errorDetail}`);
+      }
+
+      let igAccessToken = igTokenData.access_token;
+      accountId = String(igTokenData.user_id || `ig-${Date.now()}`);
+
+      // 2. Exchange short-lived token for 60-day long-lived token via graph.instagram.com
+      try {
+        const longLivedRes = await fetch(
+          `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(igClientSecret)}&access_token=${encodeURIComponent(igAccessToken)}`
         );
-        const tokenData = await tokenRes.json();
-
-        if (!tokenRes.ok || !tokenData.access_token) {
-          throw new Error(tokenData.error?.message || 'Failed to exchange Instagram access token');
+        const longLivedData = await longLivedRes.json();
+        if (longLivedRes.ok && longLivedData.access_token) {
+          igAccessToken = longLivedData.access_token;
+          expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
+        } else {
+          console.warn('[Instagram OAuth] Long-lived exchange notice:', longLivedData);
         }
+      } catch (longErr) {
+        console.warn('[Instagram OAuth] Long-lived exchange error:', longErr);
+      }
 
-        let userAccessToken = tokenData.access_token;
+      accessToken = igAccessToken;
 
-        try {
-          const longLivedRes = await fetch(
-            `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaClientId}&client_secret=${metaClientSecret}&fb_exchange_token=${userAccessToken}`
-          );
-          const longLivedData = await longLivedRes.json();
-          if (longLivedData.access_token) {
-            userAccessToken = longLivedData.access_token;
-            expiresAt = new Date(Date.now() + (longLivedData.expires_in || 5184000) * 1000).toISOString();
-          }
-        } catch (e) {
-          console.warn('Long lived exchange warning:', e);
+      // 3. Fetch Instagram profile details directly from graph.instagram.com (ZERO Facebook dependency)
+      try {
+        const meRes = await fetch(
+          `https://graph.instagram.com/v22.0/me?fields=id,username,name,account_type,profile_picture_url&access_token=${encodeURIComponent(accessToken)}`
+        );
+        const meData = await meRes.json();
+        if (meRes.ok) {
+          clientName = meData.username || meData.name || 'Instagram User';
+          if (meData.id) accountId = meData.id;
+        } else {
+          clientName = 'Instagram Account';
         }
-
-        let igFound = false;
-
-        // 1. Direct Instagram Accounts linked to Meta user profile (NO FB Pages needed!)
-        try {
-          const directIgRes = await fetch(
-            `https://graph.facebook.com/v22.0/me?fields=id,name,instagram_accounts{id,username,name}&access_token=${userAccessToken}`
-          );
-          const directIgData = await directIgRes.json();
-          if (directIgData.instagram_accounts?.data && directIgData.instagram_accounts.data.length > 0) {
-            const directAccount = directIgData.instagram_accounts.data[0];
-            accountId = directAccount.id;
-            clientName = directAccount.username || directAccount.name || 'Instagram Account';
-            accessToken = userAccessToken;
-            igFound = true;
-          }
-        } catch (dirErr) {
-          console.warn('[IG Callback] Direct instagram_accounts query warning:', dirErr);
-        }
-
-        // 2. Query linked Instagram Business Account from managed pages (fallback)
-        if (!igFound) {
-          const accountsRes = await fetch(
-            `https://graph.facebook.com/v22.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${userAccessToken}`
-          );
-          const accountsData = await accountsRes.json();
-
-          if (accountsData.data && Array.isArray(accountsData.data)) {
-            for (const page of accountsData.data) {
-              if (page.instagram_business_account) {
-                accountId = page.instagram_business_account.id;
-                clientName = page.instagram_business_account.username || page.instagram_business_account.name || page.name;
-                accessToken = page.access_token || userAccessToken;
-                igFound = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (!igFound) {
-          try {
-            const meRes2 = await fetch(
-              `https://graph.facebook.com/v22.0/me?fields=businesses{owned_pages{id,name,access_token,instagram_business_account{id,username}}}&access_token=${userAccessToken}`
-            );
-            const meData2 = await meRes2.json();
-            const businesses = meData2.businesses?.data || [];
-            for (const biz of businesses) {
-              const pages = biz.owned_pages?.data || [];
-              for (const page of pages) {
-                if (page.instagram_business_account) {
-                  accountId = page.instagram_business_account.id;
-                  clientName = page.instagram_business_account.username || page.name;
-                  accessToken = page.access_token || userAccessToken;
-                  igFound = true;
-                  break;
-                }
-              }
-              if (igFound) break;
-            }
-          } catch (bizErr) {
-            console.warn('[IG Callback] Business portfolio fallback failed:', bizErr);
-          }
-        }
-
-        if (!igFound) {
-          const meRes = await fetch(`https://graph.facebook.com/v22.0/me?access_token=${userAccessToken}`);
-          const meData = await meRes.json();
-          accountId = meData.id || `meta-${Date.now()}`;
-          clientName = meData.name || 'Instagram Account';
-          accessToken = userAccessToken;
-        }
+      } catch {
+        clientName = 'Instagram Account';
       }
     } else if (platformKey === 'facebook') {
       const { clientId, clientSecret } = getCleanFacebookCredentials();
