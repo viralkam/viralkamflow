@@ -5,15 +5,21 @@ import {
   getCleanFacebookCredentials,
   getCleanInstagramCredentials,
   getCleanThreadsCredentials,
+  getFacebookOAuthRedirectUri,
+  getInstagramOAuthRedirectUri,
+  getThreadsOAuthRedirectUri,
+  readEnvKey,
 } from '@/lib/oauthUrl';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Admin Credentials Management Route
  * 
- * Allows Admin to view and update App IDs and Secrets for:
- * - Facebook
- * - Instagram
- * - Threads
+ * Inspects and safely updates environment configurations for:
+ * - Meta App (META_CLIENT_ID / META_CLIENT_SECRET)
+ * - Instagram Unified Login (INSTAGRAM_CONFIG_ID)
+ * - Threads App (THREADS_APP_ID / THREADS_APP_SECRET)
  */
 export async function GET() {
   const fb = getCleanFacebookCredentials();
@@ -24,14 +30,18 @@ export async function GET() {
     facebook: {
       appId: fb.clientId || '',
       hasSecret: Boolean(fb.clientSecret),
+      redirectUri: getFacebookOAuthRedirectUri(),
     },
     instagram: {
       appId: ig.clientId || '',
       hasSecret: Boolean(ig.clientSecret),
+      configId: ig.configId || '',
+      redirectUri: getInstagramOAuthRedirectUri(),
     },
     threads: {
       appId: th.clientId || '',
       hasSecret: Boolean(th.clientSecret),
+      redirectUri: getThreadsOAuthRedirectUri(),
     },
   });
 }
@@ -54,31 +64,29 @@ export async function POST(req: NextRequest) {
       process.env[key] = cleanVal;
     };
 
-    if (body.facebookAppId) {
-      updateEnvVar('FACEBOOK_APP_ID', body.facebookAppId);
-      updateEnvVar('META_CLIENT_ID', body.facebookAppId);
+    // Meta App / Facebook
+    if (body.metaAppId || body.facebookAppId) {
+      const val = body.metaAppId || body.facebookAppId;
+      updateEnvVar('META_CLIENT_ID', val);
+      updateEnvVar('FACEBOOK_APP_ID', val);
     }
-    if (body.facebookAppSecret) {
-      updateEnvVar('FACEBOOK_APP_SECRET', body.facebookAppSecret);
-      updateEnvVar('META_CLIENT_SECRET', body.facebookAppSecret);
-    }
-
-    if (body.instagramAppId) {
-      updateEnvVar('INSTAGRAM_APP_ID', body.instagramAppId);
-      updateEnvVar('INSTAGRAM_CLIENT_ID', body.instagramAppId);
-    }
-    if (body.instagramAppSecret) {
-      updateEnvVar('INSTAGRAM_APP_SECRET', body.instagramAppSecret);
-      updateEnvVar('INSTAGRAM_CLIENT_SECRET', body.instagramAppSecret);
+    if (body.metaAppSecret || body.facebookAppSecret) {
+      const val = body.metaAppSecret || body.facebookAppSecret;
+      updateEnvVar('META_CLIENT_SECRET', val);
+      updateEnvVar('FACEBOOK_APP_SECRET', val);
     }
 
+    // Instagram Unified Login Configuration ID
+    if (body.instagramConfigId !== undefined) {
+      updateEnvVar('INSTAGRAM_CONFIG_ID', body.instagramConfigId);
+    }
+
+    // Threads App
     if (body.threadsAppId) {
       updateEnvVar('THREADS_APP_ID', body.threadsAppId);
-      updateEnvVar('THREADS_CLIENT_ID', body.threadsAppId);
     }
     if (body.threadsAppSecret) {
       updateEnvVar('THREADS_APP_SECRET', body.threadsAppSecret);
-      updateEnvVar('THREADS_CLIENT_SECRET', body.threadsAppSecret);
     }
 
     fs.writeFileSync(envPath, envContent.trim() + '\n', 'utf8');

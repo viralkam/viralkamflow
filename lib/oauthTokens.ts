@@ -1,19 +1,18 @@
 import { createServerSupabaseClient } from './supabaseServer';
 import { logAudit } from './auditLogger';
-import {
-  getCleanFacebookCredentials,
-  getCleanInstagramCredentials,
-  getCleanThreadsCredentials,
-} from './oauthUrl';
+import { refreshFacebookToken } from './oauth/facebookService';
+import { refreshInstagramToken } from './oauth/instagramService';
+import { refreshThreadsToken } from './oauth/threadsService';
 import { getUserData, saveUserData } from './userStore';
+import { getD1Config, saveD1Account } from './cloudflareD1';
 
 /**
  * Server-Side OAuth Token Manager with Automatic Refresh
  * 
  * CRITICAL SECURITY:
  * - Tokens and secrets NEVER leave the server.
- * - Auto-refreshes Meta and Threads tokens when expired or nearing expiration (< 24 hours).
- * - Seamlessly supports both Supabase database and local userStore.
+ * - Auto-refreshes Meta, Instagram and Threads tokens when expired or nearing expiration (< 24 hours).
+ * - Seamlessly supports Supabase, Cloudflare D1, and local userStore.
  */
 export async function getValidAccessToken(accountId: string): Promise<{
   accessToken: string;
@@ -98,55 +97,22 @@ export async function getValidAccessToken(accountId: string): Promise<{
 
   try {
     if (account.platform === 'Facebook') {
-      const { clientId, clientSecret } = getCleanFacebookCredentials();
-
-      if (!clientId || !clientSecret) {
-        throw new Error('Missing Facebook OAuth client credentials.');
-      }
-
-      console.log(`[OAuth Auto-Refresh]: Refreshing Facebook token for account ${account.client_name}...`);
-      const metaRes = await fetch(
-        `https://graph.facebook.com/v22.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${account.oauth_access_token}`
-      );
-
-      const metaData = await metaRes.json();
-      if (metaRes.ok && metaData.access_token) {
-        refreshedToken = metaData.access_token;
-        newExpiresAt = new Date(Date.now() + (metaData.expires_in || 5184000) * 1000).toISOString();
+      const res = await refreshFacebookToken(account.oauth_access_token);
+      if (res.success && res.accessToken) {
+        refreshedToken = res.accessToken;
+        newExpiresAt = res.expiresAt || null;
       }
     } else if (account.platform === 'Instagram') {
-      console.log(`[OAuth Auto-Refresh]: Refreshing Instagram token for account ${account.client_name}...`);
-      try {
-        const igRefreshRes = await fetch(
-          `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${account.oauth_access_token}`
-        );
-        const igRefreshData = await igRefreshRes.json();
-        if (igRefreshRes.ok && igRefreshData.access_token) {
-          refreshedToken = igRefreshData.access_token;
-          newExpiresAt = new Date(Date.now() + (igRefreshData.expires_in || 5184000) * 1000).toISOString();
-        }
-      } catch (igRefreshErr) {
-        console.warn('[OAuth Auto-Refresh] Instagram refresh error:', igRefreshErr);
+      const res = await refreshInstagramToken(account.oauth_access_token);
+      if (res.success && res.accessToken) {
+        refreshedToken = res.accessToken;
+        newExpiresAt = res.expiresAt || null;
       }
     } else if (account.platform === 'Threads') {
-      const { clientSecret } = getCleanThreadsCredentials();
-
-      if (!clientSecret) {
-        throw new Error('Missing Threads OAuth client secret.');
-      }
-
-      console.log(`[OAuth Auto-Refresh]: Refreshing Threads token for account ${account.client_name}...`);
-      try {
-        const thRes = await fetch(
-          `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${clientSecret}&access_token=${account.oauth_access_token}`
-        );
-        const thData = await thRes.json();
-        if (thRes.ok && thData.access_token) {
-          refreshedToken = thData.access_token;
-          newExpiresAt = new Date(Date.now() + (thData.expires_in || 5184000) * 1000).toISOString();
-        }
-      } catch (thErr) {
-        console.warn('Threads token refresh warning:', thErr);
+      const res = await refreshThreadsToken(account.oauth_access_token);
+      if (res.success && res.accessToken) {
+        refreshedToken = res.accessToken;
+        newExpiresAt = res.expiresAt || null;
       }
     }
 
@@ -161,6 +127,27 @@ export async function getValidAccessToken(accountId: string): Promise<{
             updated_at: new Date().toISOString(),
           })
           .eq('id', account.id);
+      }
+
+      // Also update in Cloudflare D1
+      try {
+        const { isConfigured } = getD1Config();
+        if (isConfigured) {
+          await saveD1Account(userStoreUserId, {
+            id: account.id,
+            clientName: account.client_name,
+            platform: account.platform,
+            connectionType: 'oauth',
+            connectionStatus: 'Connected',
+            oauthAccountId: account.oauth_account_id,
+            oauthAccessToken: refreshedToken,
+            oauthTokenExpiresAt: newExpiresAt || undefined,
+            createdAt: account.created_at || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch (d1Err) {
+        console.warn('[D1 token refresh update notice]:', d1Err);
       }
 
       // Also update in userStore

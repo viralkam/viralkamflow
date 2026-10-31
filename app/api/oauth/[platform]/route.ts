@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getFacebookOAuthRedirectUri,
-  getInstagramOAuthRedirectUri,
-  getThreadsOAuthRedirectUri,
-  getCleanFacebookCredentials,
-  getCleanInstagramCredentials,
-  getCleanThreadsCredentials,
-  getFacebookScopes,
-  getInstagramScopes,
-  getThreadsScopes,
-  getMetaConfigId,
-} from '@/lib/oauthUrl';
+import { getFacebookAuthUrl } from '@/lib/oauth/facebookService';
+import { getInstagramAuthUrl } from '@/lib/oauth/instagramService';
+import { getThreadsAuthUrl } from '@/lib/oauth/threadsService';
+
+export const dynamic = 'force-dynamic';
 
 /**
- * Server-Side OAuth Initiation Handler
+ * Dynamic Platform OAuth Dispatcher Route
  * 
- * Never exposes secrets to the browser.
- * Validates credentials server-side and redirects to provider OAuth login.
- * If credentials are not configured, redirects back with an error code.
+ * Delegates to:
+ * - Facebook OAuth Service
+ * - Instagram Unified Login OAuth Service
+ * - Threads OAuth Service
  */
 export async function GET(
   request: NextRequest,
@@ -28,71 +22,55 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams;
   const accountId = searchParams.get('accountId');
-  const userId = searchParams.get('userId') || request.cookies.get('pf_session_user_id')?.value || 'admin';
-  const stateData = JSON.stringify({ accountId: accountId || null, userId });
-  const stateQuery = `&state=${encodeURIComponent(Buffer.from(stateData).toString('base64'))}`;
+  const userId =
+    searchParams.get('userId') || request.cookies.get('pf_session_user_id')?.value || 'admin';
 
-  // 1. FACEBOOK OAUTH (100% Facebook Pages Login - ZERO Instagram)
+  // 1. FACEBOOK OAUTH
   if (platformKey === 'facebook' || platformKey === 'meta') {
-    const { clientId, clientSecret } = getCleanFacebookCredentials();
-
-    if (!clientId || !clientSecret) {
+    const { url, error } = getFacebookAuthUrl(request.nextUrl.origin, userId, accountId);
+    if (!url || error) {
       return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=facebook', request.url)
+        new URL(
+          `/connect?error=oauth_not_configured&platform=facebook&message=${encodeURIComponent(
+            error || 'Facebook App credentials not configured'
+          )}`,
+          request.url
+        )
       );
     }
-
-    const redirectUri = getFacebookOAuthRedirectUri(request);
-    const scopes = getFacebookScopes();
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
-
-    return NextResponse.redirect(authUrl);
+    return NextResponse.redirect(url);
   }
 
-  // 2. INSTAGRAM OAUTH (Independent Instagram API with Instagram Login)
-  // Official Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
+  // 2. INSTAGRAM OAUTH (Unified Login)
   if (platformKey === 'instagram') {
-    const redirectUri = getInstagramOAuthRedirectUri(request);
-    const { clientId, clientSecret } = getCleanInstagramCredentials();
-
-    // If Instagram credentials are not configured, do not invent or fallback to Facebook
-    if (!clientId || !clientSecret) {
+    const { url, error } = getInstagramAuthUrl(request.nextUrl.origin, userId, accountId);
+    if (!url || error) {
       return NextResponse.redirect(
-        new URL('/connect?error=instagram_not_configured&platform=instagram', request.url)
+        new URL(
+          `/connect?error=instagram_not_configured&platform=instagram&message=${encodeURIComponent(
+            error || 'Instagram Unified Login credentials not configured'
+          )}`,
+          request.url
+        )
       );
     }
-
-    const scopeParam = searchParams.get('scope');
-    const scopes = scopeParam || getInstagramScopes() || 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
-
-    // Direct Instagram OAuth Authorization URL
-    const authUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
-
-    return NextResponse.redirect(authUrl);
+    return NextResponse.redirect(url);
   }
 
   // 3. THREADS OAUTH
   if (platformKey === 'threads') {
-    const { clientId, clientSecret } = getCleanThreadsCredentials();
-
-    if (!clientId || !clientSecret) {
+    const { url, error } = getThreadsAuthUrl(request.nextUrl.origin, userId, accountId);
+    if (!url || error) {
       return NextResponse.redirect(
-        new URL('/connect?error=oauth_not_configured&platform=threads', request.url)
+        new URL(
+          `/connect?error=threads_not_configured&platform=threads&message=${encodeURIComponent(
+            error || 'Threads credentials not configured'
+          )}`,
+          request.url
+        )
       );
     }
-
-    const redirectUri = getThreadsOAuthRedirectUri(request);
-    const scopes = getThreadsScopes();
-
-    const authUrl = `https://threads.net/oauth/authorize?client_id=${clientId}&app_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${encodeURIComponent(scopes)}&response_type=code${stateQuery}`;
-
-    return NextResponse.redirect(authUrl);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.redirect(new URL('/connect?error=unsupported_platform', request.url));

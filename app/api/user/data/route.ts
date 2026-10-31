@@ -132,6 +132,25 @@ export async function POST(req: NextRequest) {
     if (action === 'delete_account') {
       existingData.accounts = existingData.accounts.filter(a => a.id !== payload.id);
       await saveUserData(sessionUserId, existingData);
+
+      // Also delete from Cloudflare D1
+      try {
+        const { deleteD1Account } = await import('@/lib/cloudflareD1');
+        await deleteD1Account(payload.id);
+      } catch (d1DelErr) {
+        console.warn('[D1 Delete Account Notice]:', d1DelErr);
+      }
+
+      // Also delete from Supabase
+      try {
+        const supabase = createServerSupabaseClient();
+        if (supabase) {
+          await supabase.from('accounts').delete().eq('id', payload.id);
+        }
+      } catch (sbDelErr) {
+        console.warn('[Supabase Delete Account Notice]:', sbDelErr);
+      }
+
       return NextResponse.json({ success: true, data: existingData });
     }
 
